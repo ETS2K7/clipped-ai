@@ -2,6 +2,7 @@ import os
 import re
 import json
 import logging
+import requests
 from typing import List, Dict, Any, Optional
 
 from config import (
@@ -93,10 +94,11 @@ def _group_into_sentences(words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def _heuristic_clip_selection(
     words: List[Dict[str, Any]],
     target_count: int = 3,
+    user_focus: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     High-accuracy heuristic selector used if LLM providers are unavailable or quota-limited.
-    Evaluates hook momentum, question/exclamation density, and speech pace.
+    Evaluates hook momentum, question/exclamation density, speech pace, and user focus keywords.
     """
     sentences = _group_into_sentences(words)
     if not sentences:
@@ -109,6 +111,12 @@ def _heuristic_clip_selection(
             "hook_type": "curiosity_gap",
             "hook_rationale": "High-retention segment capturing the primary narrative flow.",
         }]
+
+    focus_terms = (
+        [t for t in re.split(r"\W+", user_focus.lower()) if len(t) > 2]
+        if user_focus
+        else []
+    )
 
     scored_candidates = []
     min_dur = MIN_CLIP_DURATION
@@ -129,6 +137,14 @@ def _heuristic_clip_selection(
 
                 score = 60
                 hook_type = "insight"
+
+                # Boost if matches user focus topic/keyword
+                if focus_terms:
+                    matched_focus = [t for t in focus_terms if t in combined_text]
+                    if matched_focus:
+                        score += 25 * len(matched_focus)
+                        if any(t in opening_sentence for t in matched_focus):
+                            score += 15
 
                 # Check opening hook strength
                 for kw in HOOK_KEYWORDS["curiosity"]:
@@ -251,6 +267,120 @@ def _call_gemini_llm(transcript_prompt: str) -> Optional[List[Dict[str, Any]]]:
         return None
 
 
+def _call_groq_llm(transcript_prompt: str) -> Optional[List[Dict[str, Any]]]:
+    api_key = os.getenv("GROQ_KEY")
+    if not api_key:
+        return None
+
+    models = [
+        "openai/gpt-oss-120b",
+        "qwen/qwen3.8-27b",
+        "openai/gpt-oss-20b",
+        "llama-3.3-70b-versatile",
+    ]
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    system_instruction = (
+        "You are an elite short-form video editor specializing in viral retention on TikTok, "
+        "YouTube Shorts, and Instagram Reels. Select 3 high-impact, standalone clips between "
+        "20 and 45 seconds each. Each clip MUST open with a strong hook and conclude on a satisfying thought. "
+        "Always respond with valid JSON containing a 'clips' array with keys: "
+        "title, start_time, end_time, virality_score, hook_type, hook_rationale."
+    )
+
+    for model in models:
+        try:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": transcript_prompt},
+                ],
+                "response_format": {"type": "json_object"},
+                "temperature": 0.4,
+            }
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=25,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                parsed = json.loads(content)
+                clips = parsed.get("clips", [])
+                if clips and isinstance(clips, list):
+                    logger.info("Successfully selected viral clips using Groq (%s)", model)
+                    return clips
+            else:
+                logger.warning("Groq model %s returned status %d", model, resp.status_code)
+        except Exception as e:
+            logger.warning("Groq call failed for %s: %s", model, e)
+
+    return None
+
+
+def _call_openrouter_llm(transcript_prompt: str) -> Optional[List[Dict[str, Any]]]:
+    api_key = os.getenv("OPENROUTER_KEY")
+    if not api_key:
+        return None
+
+    models = [
+        "google/gemini-2.5-flash",
+        "meta-llama/llama-3.3-70b-instruct",
+        "anthropic/claude-3.5-haiku",
+    ]
+
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    system_instruction = (
+        "You are an elite short-form video editor specializing in viral retention on TikTok, "
+        "YouTube Shorts, and Instagram Reels. Select 3 high-impact, standalone clips between "
+        "20 and 45 seconds each. Each clip MUST open with a strong hook and conclude on a satisfying thought. "
+        "Always respond with valid JSON containing a 'clips' array with keys: "
+        "title, start_time, end_time, virality_score, hook_type, hook_rationale."
+    )
+
+    for model in models:
+        try:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": transcript_prompt},
+                ],
+                "response_format": {"type": "json_object"},
+                "max_tokens": 1500,
+                "temperature": 0.4,
+            }
+            resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
+                parsed = json.loads(content)
+                clips = parsed.get("clips", [])
+                if clips and isinstance(clips, list):
+                    logger.info("Successfully selected viral clips using OpenRouter (%s)", model)
+                    return clips
+            else:
+                logger.warning("OpenRouter model %s returned status %d", model, resp.status_code)
+        except Exception as e:
+            logger.warning("OpenRouter call failed for %s: %s", model, e)
+
+    return None
+
+
 def select_viral_clips(
     words: List[Dict[str, Any]],
     user_focus: Optional[str] = None,
@@ -293,11 +423,15 @@ def select_viral_clips(
     if user_focus:
         prompt += f"\nFocus specifically on moments related to: '{user_focus}'."
 
-    # Try LLM first, gracefully fall back to heuristic
+    # Try LLMs in cascade: Gemini -> Groq -> OpenRouter -> Heuristic
     raw_clips = _call_gemini_llm(prompt)
     if not raw_clips:
+        raw_clips = _call_groq_llm(prompt)
+    if not raw_clips:
+        raw_clips = _call_openrouter_llm(prompt)
+    if not raw_clips:
         logger.info("Using heuristic viral selection engine...")
-        raw_clips = _heuristic_clip_selection(words)
+        raw_clips = _heuristic_clip_selection(words, user_focus=user_focus)
 
     # Snap boundaries and validate
     validated_clips: List[Dict[str, Any]] = []
@@ -313,12 +447,17 @@ def select_viral_clips(
             snapped["end"] = snapped["start"] + 20.0
             dur = 20.0
 
+        raw_score = int(raw.get("virality_score", 88))
+        if 1 <= raw_score <= 10:
+            raw_score *= 10
+        raw_score = max(1, min(100, raw_score))
+
         validated_clips.append({
             "title": raw.get("title", "Viral Moment"),
             "start_time": snapped["start"],
             "end_time": snapped["end"],
             "duration": round(dur, 2),
-            "virality_score": int(raw.get("virality_score", 88)),
+            "virality_score": raw_score,
             "hook_type": raw.get("hook_type", "curiosity_gap"),
             "hook_rationale": raw.get("hook_rationale", "High emotional momentum and strong viewer hook."),
         })

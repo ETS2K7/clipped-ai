@@ -110,18 +110,12 @@ def main():
             print(f"❌ File not found or invalid YouTube URL: {cleaned_source}")
             print("   Please provide a valid file path or YouTube link.\n")
 
-    # 2. Prompt for Caption Style
-    print("\nSelect Subtitle Style:")
-    print("  1) Hormozi (Bold alternating yellow/green neon highlight - Recommended)")
-    print("  2) Minimal (Clean white typography with soft gold accents)")
-    print("  3) Cyber   (Futuristic cyan and magenta glow)")
-    style_choice = input("Choice [1/2/3] (default 1): ").strip()
-
-    style_map = {"1": "hormozi", "2": "minimal", "3": "cyber"}
-    caption_style = style_map.get(style_choice, "hormozi")
+    # 2. Subtitle Style
+    caption_style = "hormozi"
+    print("\nSubtitle Style: Hormozi (Bold alternating yellow/green neon highlight)")
 
     # 3. Prompt for Keyword / Focus (Optional)
-    focus_input = input("\nSpecific moment or keyword to prioritize (press Enter to skip): ").strip()
+    focus_input = input("Specific moment or keyword to prioritize (press Enter to skip): ").strip()
     user_focus = focus_input if focus_input else None
 
     # 4. Prepare Destination Folder inside test/
@@ -142,7 +136,7 @@ def main():
     print("\n" + "-" * 60)
     print(f"🚀 Starting Clipping Pipeline [Task: {task_id}]")
     print(f"📁 Output Folder: {output_subfolder.relative_to(ROOT_DIR)}" + (" (overwriting existing clips)" if is_overwrite else ""))
-    print(f"🎨 Caption Style: {caption_style.upper()}")
+    print("🎨 Caption Style: Hormozi (Bold alternating yellow/green neon highlight)")
     if user_focus:
         print(f"🎯 Target Focus:  '{user_focus}'")
     print("-" * 60 + "\n")

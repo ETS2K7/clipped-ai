@@ -110,9 +110,10 @@ Create a `backend/.env` file with your credentials:
 # Speech-to-text with word-level timestamps
 ASSEMBLYAI_KEY=your_assemblyai_api_key
 
-# Optional: LLM keys (system includes automatic heuristic fallback)
+# Optional: LLM keys (supports Gemini, Groq, OpenRouter, and heuristic fallback)
 GEMINI_API_KEY=your_gemini_api_key
 GROQ_KEY=your_groq_api_key
+OPENROUTER_KEY=your_openrouter_api_key
 
 PORT=8000
 HOST=0.0.0.0
