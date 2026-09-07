@@ -33,7 +33,6 @@ temp/
 *.wav
 *.ass
 *.srt
-!samples/*.mp4
 
 # Model weights
 *.pth
