@@ -1,0 +1,50 @@
+# Environments
+.env
+.env*.local
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.ruff_cache/
+
+# Node & Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Media and temporary output
+storage/
+output/
+temp/
+*.mp4
+*.avi
+*.ogg
+*.wav
+*.ass
+*.srt
+!samples/*.mp4
+
+# Model weights
+*.pth
+*.model
+*.onnx
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Internal / Meta
+hackathon.md
