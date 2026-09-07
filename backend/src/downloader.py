@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import json
 import subprocess
@@ -6,9 +7,20 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 import cv2
-from config import get_logger, STORAGE_DIR
+from config import get_logger, STORAGE_DIR, PROJECT_DIR
 
 logger = get_logger(__name__)
+
+def _find_ytdlp() -> str:
+    """Finds the most up-to-date yt-dlp binary (prioritizing virtual environment)."""
+    env_bin = Path(sys.executable).parent / "yt-dlp"
+    if env_bin.exists():
+        return str(env_bin)
+    venv_bin = PROJECT_DIR / "venv" / "bin" / "yt-dlp"
+    if venv_bin.exists():
+        return str(venv_bin)
+    return "yt-dlp"
+
 
 YOUTUBE_URL_REGEX = re.compile(
     r"^(https?://)?(www\.|m\.)?(youtube\.com/(watch\?v=|embed/|v/)|youtu\.be/)([\w-]{11})"
@@ -107,9 +119,9 @@ def download_youtube(url: str, output_dir: Optional[Path] = None) -> Dict[str, A
     output_template = str(save_dir / "original.%(ext)s")
 
     cmd = [
-        "yt-dlp",
+        _find_ytdlp(),
         "--no-playlist",
-        "--format", "bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][ext=mp4]/best",
+        "--format", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
         "--merge-output-format", "mp4",
         "--write-info-json",
         "--output", output_template,

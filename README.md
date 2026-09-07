@@ -109,9 +109,16 @@ PORT=8000
 HOST=0.0.0.0
 ```
 
-### 3. Run the Engine Server
+### 3. Interactive CLI Testing
+Process any YouTube URL or local video file directly from your terminal:
 ```bash
-python backend/server.py
+./cli.py
+```
+Generated 9:16 clips, hook thumbnails, subtitle files, and the Creator SEO Pack will be automatically saved into individual subfolders inside the `test/` directory.
+
+### 4. Run the API Server
+```bash
+./backend/run.sh
 ```
 The server will start on `http://localhost:8000`.
 

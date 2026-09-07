@@ -27,6 +27,7 @@ yarn-error.log*
 storage/
 output/
 temp/
+test/
 *.mp4
 *.avi
 *.ogg
