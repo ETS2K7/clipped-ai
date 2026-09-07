@@ -8,7 +8,6 @@ BACKEND_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = BACKEND_DIR.parent
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR", str(PROJECT_DIR / "storage"))).resolve()
 FONTS_DIR = (BACKEND_DIR / "fonts").resolve()
-SAMPLES_DIR = (PROJECT_DIR / "samples").resolve()
 
 # Dedicated cache directories for deterministic reuse
 SOURCES_CACHE_DIR = (STORAGE_DIR / "sources").resolve()
@@ -19,7 +18,6 @@ ASD_CACHE_DIR = (STORAGE_DIR / "asd_cache").resolve()
 
 for cache_d in (
     STORAGE_DIR,
-    SAMPLES_DIR,
     SOURCES_CACHE_DIR,
     AUDIO_CACHE_DIR,
     TRANSCRIPTS_CACHE_DIR,
@@ -54,6 +52,8 @@ def get_assemblyai_key() -> str:
     if not key:
         raise ValueError("ASSEMBLYAI_KEY is required for speech transcription.")
     return key
+
+ASSEMBLYAI_KEY = get_assemblyai_key
 
 def get_gemini_key() -> str:
     return os.getenv("GEMINI_API_KEY", "")

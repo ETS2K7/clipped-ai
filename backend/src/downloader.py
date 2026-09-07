@@ -234,3 +234,9 @@ def download_youtube(url: str, output_dir: Optional[Path] = None) -> Dict[str, A
         "height": video_info["height"],
         "fps": video_info["fps"],
     }
+
+
+def download_video(url: str) -> str:
+    """Compatibility wrapper matching Documents/clippedai download_video signature."""
+    meta = download_youtube(url)
+    return meta["video_path"]

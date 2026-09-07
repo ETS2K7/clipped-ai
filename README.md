@@ -42,23 +42,32 @@ graph TD
 
 ## Core Features
 
-### 1. Active Speaker Detection (Fast-ASD)
-Unlike basic face detectors that crop blindly or jump erratically between people, ClippedAI uses **Fast-ASD** (combining **TalkNet** audio-visual speech correlation and **S3FD** face detection). It detects visual lip movement synchronized with speech audio to reliably follow who is actually talking in interviews, multi-host podcasts, and panel discussions.
+### 1. Active Speaker Detection & Diarization-Visual Fusion
+- **Fast-ASD (TalkNet + S3FD)**: Combines audio-visual lip synchrony tracking with robust face detection natively on Apple Silicon (MPS) or CPU with zero cloud GPU dependencies.
+- **Diarization-Visual Fusion**: Maps AssemblyAI word timestamps and speaker IDs to visual face locations, eliminating identity confusion and false switches during banter or overlapping speech.
 
-### 2. Camera Motion Stabilization & Cluster Locking
-- **Stationary Cluster Locking**: Groups speaker positions into spatial clusters. When a speaker is sitting or standing still, camera position locks to the cluster median, eliminating distracting camera micro-jitter.
-- **Natural Speaker Cuts**: Snaps cleanly to new speakers when the active speaker changes, preventing awkward slow pans across cuts.
-- **Gaussian Smoothing**: Applies 1D Gaussian temporal filtering for genuine camera pans when a subject walks or moves across the frame.
+### 2. Adaptive Multi-Speaker Split-Screen Framing
+- **Intelligent Split-Screen Layouts**:
+  - **2 Speakers**: Automatically stacks both speakers vertically (`_render_split_2`, 1080×960 per cell) during wide shots.
+  - **3 Speakers**: Renders featured speaker on top (1080×960) with two active participants side-by-side on the bottom (`_render_split_3`, 540×960 each).
+  - **4 Speakers**: Renders a clean 2×2 panel grid (`_render_split_4`, 540×960 each).
+- **2D AR-Safe Headroom Framing (`_ar_safe_crop`)**: Preserves the exact aspect ratio of each cell with natural vertical headroom ($cy = 0.42$), eliminating distortion and unexpected zoom cutoffs across all input video resolutions.
 
-### 3. Hook Detection & Semantic Word Boundary Snapping
+### 3. Camera Motion Stabilization & Cluster Locking
+- **Stationary Cluster Locking**: Groups speaker positions into spatial clusters (`signal_helpers.py`). When speakers are stationary, the framing locks completely with **zero micro-jitter, zero drift, and zero horizontal panning**.
+- **Instant Snap-Cuts**: Snaps immediately to new speakers or camera angles upon speech transitions, preventing awkward slow pans across cuts.
+- **PySceneDetect Hard Cuts**: Detects camera angle changes (`ContentDetector(threshold=27.0)`) and enforces hard cuts.
+- **Motion-Only Smoothing**: Applies Gaussian temporal filtering ($\sigma = 12$) exclusively when a speaker physically moves across the source frame.
+
+### 4. Hook Detection & Semantic Word Boundary Snapping
 - Identifies high-retention segments (20–45s) scored on psychological retention triggers (*Curiosity Gap*, *Contrarian*, *Insight*).
 - **Semantic Boundary Snapping**: Snaps clip cut points to exact spoken word boundaries from transcript timestamps and applies natural breath buffers (-0.2s start, +0.3s end) so words are never clipped mid-syllable.
 
-### 4. Dynamic Karaoke Subtitles
-- Generates Advanced SubStation Alpha (`.ass`) subtitles with word-by-word active glow highlights.
-- Styled in popular creator aesthetics (Hormozi, Minimal, Cyberpunk) positioned strictly above mobile UI safe zones.
+### 5. Layout-Aware Dynamic Karaoke Subtitles
+- **Layout Awareness**: In `SPLIT` mode, subtitles automatically center at `{\an5\pos(540,960)}` directly on the dividing seam between stacked speakers, ensuring captions never overlap either face. In `SINGLE` mode, captions sit in the lower third.
+- **Creator Typography**: Styled in popular creator aesthetics (Hormozi / Komika Axis) with active word glow highlights and soft aura effects.
 
-### 5. Automated Channel Distribution Pack
+### 6. Automated Channel Distribution Pack
 - **Click-Worthy Hook Thumbnails**: Extracts the emotional peak frame from the hook and composites bold, high-contrast hook text with dark gradient contrast vignettes.
 - **Platform-Optimized Copy**: Automatically generates 3 title variations, descriptions, tags, and hashtags tailored specifically for YouTube Shorts, TikTok, and Instagram Reels.
 
@@ -109,19 +118,20 @@ PORT=8000
 HOST=0.0.0.0
 ```
 
-### 3. Interactive CLI Testing
-Process any YouTube URL or local video file directly from your terminal:
+### 3. Running the Pipeline
+You can run ClippedAI via the interactive CLI or the API server:
+
+**Option A: Interactive Creator CLI (Generates Video, Thumbnails & SEO Packs)**
 ```bash
 ./cli.py
 ```
-Generated 9:16 clips, hook thumbnails, subtitle files, and the Creator SEO Pack will be automatically saved into individual subfolders inside the `test/` directory.
+Generated 9:16 clips, hook thumbnails, subtitle files, and the Creator SEO Pack will be automatically saved into individual subfolders inside `test/`.
 
-### 4. Run the API Server
+**Option B: Run the API Server**
 ```bash
 ./backend/run.sh
 ```
 The server will start on `http://localhost:8000`.
-
 - Health check: `http://localhost:8000/health`
 - Interactive API Docs: `http://localhost:8000/docs`
 - Media stream storage: `http://localhost:8000/media/`

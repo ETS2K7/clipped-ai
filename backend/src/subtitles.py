@@ -1,75 +1,116 @@
-import os
-import re
-import subprocess
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+"""
+Module for generating dynamic ASS subtitles with karaoke animations and layout boundaries.
+"""
 
-from config import get_logger, FONTS_DIR, DEFAULT_FONT_PATH
+from typing import List, Dict, Any, Optional
+import re
+from config import get_logger
 
 logger = get_logger(__name__)
 
-STYLE_PRESETS = {
-    "hormozi": {
-        "font_name": "Komika Axis",
-        "font_size": 110,
-        "primary_color": "&H00FFFFFF",      # White text
-        "outline_color": "&H00000000",      # Black outline
-        "outline_width": 6,
-        "highlight_colors": ["&H0000FFFF", "&H0000FF00"], # Yellow & Green
-        "blur": 4,
-    },
-    "minimal": {
-        "font_name": "Arial",
-        "font_size": 95,
-        "primary_color": "&H00F0F0F0",
-        "outline_color": "&H00202020",
-        "outline_width": 4,
-        "highlight_colors": ["&H0033CCFF"], # Soft Gold
-        "blur": 2,
-    },
-    "cyber": {
-        "font_name": "Impact",
-        "font_size": 115,
-        "primary_color": "&H00FFFFFF",
-        "outline_color": "&H00000000",
-        "outline_width": 7,
-        "highlight_colors": ["&H00FFFF00", "&H00FF00FF"], # Cyan & Magenta
-        "blur": 6,
-    },
-}
+# ─── Default subtitle styling ─────────────────────────────────────────────────
+DEFAULT_FONT_FAMILY = "Komika Axis"
+DEFAULT_FONT_SIZE = 115
+DEFAULT_FONT_COLOR = "&H00FFFFFF"   # ASS format: white
+
+FONT_NAME_RE = re.compile(r"^[A-Za-z0-9 _.-]{1,128}$")
+
+
+def hex_to_ass_color(value: Optional[str]) -> str:
+    """Convert #RRGGBB to ASS &H00BBGGRR format."""
+    if not value or not re.fullmatch(r"#[0-9A-Fa-f]{6}", value):
+        return DEFAULT_FONT_COLOR
+    red = value[1:3]
+    green = value[3:5]
+    blue = value[5:7]
+    return f"&H00{blue}{green}{red}".upper()
+
+
+def resolve_font_family(value: Optional[str]) -> str:
+    if not value:
+        return DEFAULT_FONT_FAMILY
+    cleaned = value.replace("_", " ").strip()
+    return cleaned if FONT_NAME_RE.fullmatch(cleaned) else DEFAULT_FONT_FAMILY
 
 
 def ms_to_ass_time(ms: float) -> str:
-    """Converts milliseconds to ASS timestamp format: H:MM:SS.CC"""
-    ms = max(0.0, ms)
+    """Converts milliseconds to ASS video format (H:MM:SS.CC)."""
     hours = int(ms // 3600000)
     minutes = int((ms % 3600000) // 60000)
     seconds = int((ms % 60000) // 1000)
-    centiseconds = int((ms % 1000) // 10)
-    return f"{hours}:{minutes:02d}:{seconds:02d}.{centiseconds:02d}"
+    cents = int((ms % 1000) // 10)
+    return f"{hours}:{minutes:02d}:{seconds:02d}.{cents:02d}"
 
 
-def generate_karaoke_ass(
+def generate_subtitles(
     words: List[Dict[str, Any]],
-    clip_start_s: float,
-    clip_end_s: float,
-    output_ass_path: str,
-    preset_name: str = "hormozi",
+    clip: Dict[str, Any],
+    idx: int,
+    framing_meta: List[Dict[str, Any]],
+    font_family: Optional[str] = None,
+    font_size: Optional[int] = None,
+    font_color: Optional[str] = None,
+    work_dir: str = "",
 ) -> str:
     """
-    Generates an Advanced SubStation Alpha (.ass) subtitle file with word-by-word
-    karaoke glow animation and mobile safe zone positioning.
-    """
-    style = STYLE_PRESETS.get(preset_name, STYLE_PRESETS["hormozi"])
-    clip_start_ms = clip_start_s * 1000.0
-    clip_end_ms = clip_end_s * 1000.0
+    Generates an .ASS subtitle file dynamically mapping words iteratively to
+    the bounding box framing logic dictating its positional styling.
 
-    # Filter words belonging to this clip
+    Accepts optional font configuration from the frontend typography bridge:
+      - font_family: e.g. "Montserrat", "Impact" (default: "Arial Black")
+      - font_size:   e.g. 40, 60 (default: 50)
+      - font_color:  hex string e.g. "#FFFFFF", "#FFD700" (default: white)
+    """
+    logger.info(
+        f"==================== PHASE 6: SUBTITLE GENERATION (Clip {idx}) ===================="
+    )
+    out = f"{work_dir}/temp_subtitles_{idx}.ass" if work_dir else f"temp_subtitles_{idx}.ass"
+    start_ms = clip["start_time"] * 1000
+    end_ms = clip["end_time"] * 1000
+
+    resolved_family = resolve_font_family(font_family)
+    resolved_size = font_size if isinstance(font_size, int) and 50 <= font_size <= 200 else DEFAULT_FONT_SIZE
+    resolved_ass_color = hex_to_ass_color(font_color)
+
+    logger.info(
+        f"Subtitle style locked: {resolved_family} / {resolved_size}pt / "
+        f"color={resolved_ass_color}"
+    )
+
+    def get_layout_for_time(ms: float) -> str:
+        for meta in framing_meta:
+            if meta["start_ms"] <= ms <= meta["end_ms"]:
+                return meta["flag"]
+        return "SINGLE"
+
     clip_words = [
-        w for w in words
-        if w.get("start", 0) >= clip_start_ms and w.get("end", 0) <= clip_end_ms
+        w for w in words if w.get("start", 0) >= start_ms and w.get("end", 0) <= end_ms
     ]
 
+    # —— Romanized Hindi Mapping Pass (V6: Anchor-Pair Sync Lock) ——
+    # Uses 'Roman:Original' pairs to lock transliterations to exact timestamps.
+    rom_input = clip.get("romanized_words")
+    if isinstance(rom_input, list) and len(clip_words) > 0:
+        logger.info(f"Applying Anchor-Pair sync lock for clip {idx} ({len(rom_input)} segments)")
+        word_idx = 0
+        for segment in rom_input:
+            segment_pairs = [p.strip() for p in segment.split("|") if ":" in p]
+            for pair in segment_pairs:
+                if word_idx >= len(clip_words):
+                    break
+                parts = pair.split(":", 1)
+                if len(parts) == 2:
+                    roman = parts[0].strip()
+                    clip_words[word_idx]["text"] = roman
+                word_idx += 1
+    elif clip.get("romanized_transcript"):
+        # Fallback to V1 (Space-separated string) for backward compatibility with cached clips
+        rom_words = str(clip["romanized_transcript"]).strip().split()
+        if abs(len(rom_words) - len(clip_words)) <= max(2, len(clip_words) // 5):
+            for i in range(min(len(rom_words), len(clip_words))):
+                clip_words[i]["text"] = rom_words[i]
+
+    # Dynamically build ASS header with resolved font configuration
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -78,87 +119,119 @@ WrapStyle: 1
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: ViralCaptions,{style['font_name']},{style['font_size']},{style['primary_color']},&H000000FF,{style['outline_color']},&H80000000,-1,0,0,0,100,100,0,0,1,{style['outline_width']},0,2,40,40,480,1
-
+Style: Hormozi,{resolved_family},{resolved_size},{resolved_ass_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,110,100,0,0,1,6,0,2,10,10,450,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-    # Group words into 2-3 word chunks based on punctuation and pauses
+    lines = []
     chunks = []
     current_chunk = []
     max_words_per_chunk = 2
     max_pause_ms = 300
 
+    # 1. Group words chunks dynamically based on pause timers + string punctuation max length breaks
     for i, w in enumerate(clip_words):
         current_chunk.append(w)
-        is_last = (i == len(clip_words) - 1)
+        is_last = i == len(clip_words) - 1
 
         if not is_last:
             next_w = clip_words[i + 1]
             pause_dur = next_w.get("start", 0) - w.get("end", 0)
-            ends_punct = any(str(w["text"]).endswith(p) for p in [".", "?", "!", ","])
+            ends_with_punct = any(str(w["text"]).endswith(p) for p in [".", "?", "!"])
             too_long = len(current_chunk) >= max_words_per_chunk
             long_pause = pause_dur > max_pause_ms
 
-            if ends_punct or too_long or long_pause:
+            if ends_with_punct or too_long or long_pause:
                 chunks.append(current_chunk)
                 current_chunk = []
         else:
             chunks.append(current_chunk)
 
-    dialogue_lines = []
-    highlight_colors = style["highlight_colors"]
-
-    for chunk_idx, chunk in enumerate(chunks):
+    for c_idx, chunk in enumerate(chunks):
         next_chunk_start = (
-            chunks[chunk_idx + 1][0].get("start", float("inf"))
-            if chunk_idx + 1 < len(chunks)
+            chunks[c_idx + 1][0].get("start", float("inf"))
+            if c_idx + 1 < len(chunks)
             else float("inf")
         )
 
-        for w_idx, active_word in enumerate(chunk):
-            w_start = active_word.get("start", 0) - clip_start_ms
+        for w_idx, w in enumerate(chunk):
+            w_start = w.get("start", 0) - start_ms
+
             if w_idx < len(chunk) - 1:
-                w_end = max(w_start + 10, chunk[w_idx + 1].get("start", 0) - clip_start_ms)
+                w_end = max(w_start + 10, chunk[w_idx + 1].get("start", 0) - start_ms)
             else:
-                w_end = active_word.get("end", 0) - clip_start_ms
-                actual_end = active_word.get("end", 0)
-                pause_to_next = next_chunk_start - actual_end
-                if pause_to_next > 0:
-                    w_end += min(pause_to_next, 400)
+                w_end = w.get("end", 0) - start_ms
+                actual_end = w.get("end", 0)
+                pause_to_next_chunk = next_chunk_start - actual_end
+
+                # Dynamic soft padding
+                if pause_to_next_chunk > 0:
+                    pad = min(pause_to_next_chunk, 400)
+                    w_end += pad
 
             w_start = max(0, w_start)
-            w_end = max(0, min(w_end, clip_end_ms - clip_start_ms))
+            w_end = max(0, min(w_end, end_ms - start_ms))
+
             if w_end <= w_start:
                 continue
 
             ass_start = ms_to_ass_time(w_start)
             ass_end = ms_to_ass_time(w_end)
+            layout = get_layout_for_time(w_start)
 
             text_parts = []
-            for j, word in enumerate(chunk):
-                raw_txt = str(word.get("text", "")).upper()
-                clean_txt = raw_txt.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+            
+            if layout == "SPLIT":
+                text_parts.append("{\\an5\\pos(540,960)}")
 
+            for j, cw in enumerate(chunk):
+                # Escape ASS special syntax characters to prevent subtitle corruption
+                raw_txt = str(cw.get("text", "")).upper()
+                clean_txt = raw_txt.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
                 if j == w_idx:
-                    hl_col = highlight_colors[w_idx % len(highlight_colors)]
-                    blur_val = style["blur"]
-                    # Glowing highlighted word
-                    text_parts.append(f"{{\\c{hl_col}\\4c{hl_col}\\blur{blur_val}}}{clean_txt}{{\\r}}")
+                    # Alternate highlight color between green and yellow based on word index
+                    hl_color = "&H0000FFFF" if w_idx % 2 == 0 else "&H0000FF00"
+                    # Add Neon Glow Effect (\4c for shadow color, \blur for soft aura)
+                    text_parts.append(
+                        f"{{\\c{hl_color}\\4c{hl_color}\\blur5}}{clean_txt}{{\\r}}"
+                    )
                 else:
                     text_parts.append(clean_txt)
 
             full_text = " ".join(text_parts)
-            dialogue_lines.append(f"Dialogue: 0,{ass_start},{ass_end},ViralCaptions,,0,0,0,,{full_text}")
+            line = f"Dialogue: 0,{ass_start},{ass_end},Hormozi,,0,0,0,,{full_text}"
+            lines.append(line)
 
-    Path(output_ass_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_ass_path, "w", encoding="utf-8") as f:
+    with open(out, "w", encoding="utf-8") as f:
         f.write(header)
-        for line in dialogue_lines:
+        for line in lines:
             f.write(line + "\n")
 
-    logger.info("Generated karaoke ASS subtitles: %s (%d events)", output_ass_path, len(dialogue_lines))
+    return out
+
+
+def generate_karaoke_ass(
+    words: List[Dict[str, Any]],
+    clip_start_s: float,
+    clip_end_s: float,
+    output_ass_path: str,
+    framing_meta: Optional[List[Dict[str, Any]]] = None,
+    preset_name: str = "hormozi",
+) -> str:
+    """Compatibility wrapper for generate_subtitles supporting direct path output."""
+    clip_dict = {"start_time": clip_start_s, "end_time": clip_end_s}
+    import tempfile
+    import shutil
+    with tempfile.TemporaryDirectory() as td:
+        out_file = generate_subtitles(
+            words=words,
+            clip=clip_dict,
+            idx=0,
+            framing_meta=framing_meta or [],
+            work_dir=td,
+        )
+        shutil.copy2(out_file, output_ass_path)
     return output_ass_path
 
 
@@ -168,40 +241,25 @@ def burn_subtitles_to_video(
     output_path: str,
     fonts_dir: Optional[str] = None,
 ) -> str:
-    """
-    Burns .ass subtitles into the portrait video with font directory support.
-    """
-    fonts_folder = fonts_dir or str(FONTS_DIR)
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-
-    # Escape path characters for ffmpeg subtitle filter
-    escaped_ass = ass_path.replace(":", "\\:").replace("'", "\\'")
-    escaped_fonts = fonts_folder.replace(":", "\\:").replace("'", "\\'")
-
-    filter_str = f"subtitles='{escaped_ass}':fontsdir='{escaped_fonts}'"
-
+    """Burns ASS subtitles into video using FFmpeg libass filter."""
+    import subprocess
+    import pathlib
+    safe_ass = str(pathlib.Path(ass_path).resolve()).replace("\\", "/").replace(":", "\\:")
+    vf_filter = f"ass={safe_ass}"
+    if fonts_dir and pathlib.Path(fonts_dir).exists():
+        safe_fonts = str(pathlib.Path(fonts_dir).resolve()).replace("\\", "/").replace(":", "\\:")
+        vf_filter += f":fontsdir={safe_fonts}"
     cmd = [
         "ffmpeg", "-y",
         "-i", video_path,
-        "-vf", filter_str,
+        "-vf", vf_filter,
         "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
         "-preset", "veryfast",
-        "-crf", "22",
+        "-crf", "23",
         "-c:a", "copy",
         "-movflags", "+faststart",
         output_path,
     ]
-
-    try:
-        subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-        )
-        logger.info("Successfully burned subtitles into: %s", output_path)
-        return output_path
-    except subprocess.CalledProcessError as e:
-        err = e.stderr.decode("utf-8", errors="replace")[-1000:] if e.stderr else str(e)
-        logger.error("Failed to burn subtitles via FFmpeg: %s", err)
-        raise RuntimeError(f"FFmpeg subtitle burn failed: {err}")
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    return output_path

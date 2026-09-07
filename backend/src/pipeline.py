@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List
 
-from config import get_logger, STORAGE_DIR
+from config import get_logger, STORAGE_DIR, FONTS_DIR
 from src.downloader import (
     get_video_info,
     download_youtube,
@@ -13,54 +13,17 @@ from src.downloader import (
 )
 from src.transcriber import transcribe_video
 from src.virality import select_viral_clips
-from src.tracker import (
-    FastASDManager,
-    compute_smoothed_camera_positions,
-    render_portrait_crop,
+from fast_asd_local import LocalFastASDTracker
+from src.video_processing import (
+    extract_segment,
+    track_speaker_and_frame,
+    merge_and_cleanup,
 )
-from src.subtitles import generate_karaoke_ass, burn_subtitles_to_video
+from src.subtitles import generate_subtitles
 from src.thumbnails import generate_hook_thumbnail
 from src.export_pack import build_creator_seo_pack, generate_srt_subtitles
 
 logger = get_logger(__name__)
-
-
-def extract_clip_segment(
-    source_video: str,
-    start_s: float,
-    end_s: float,
-    output_path: str,
-) -> str:
-    """Extracts a high-quality video subclip using FFmpeg with re-encoding. Reuses existing clip if present."""
-    if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-        logger.info("Reusing cached raw subclip: %s", output_path)
-        return output_path
-
-    dur = max(1.0, end_s - start_s)
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-ss", str(start_s),
-        "-i", source_video,
-        "-t", str(dur),
-        "-c:v", "libx264",
-        "-preset", "veryfast",
-        "-crf", "20",
-        "-c:a", "aac",
-        "-b:a", "128k",
-        "-avoid_negative_ts", "make_zero",
-        "-movflags", "+faststart",
-        output_path,
-    ]
-
-    subprocess.run(
-        cmd,
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
-    return output_path
 
 
 def run_pipeline(
@@ -131,7 +94,7 @@ def run_pipeline(
     progress_step = 35.0 / len(clips)
     current_progress = 55.0
 
-    asd_manager = FastASDManager.get_instance()
+    local_tracker = LocalFastASDTracker.get_instance()
 
     for idx, clip in enumerate(clips, start=1):
         clip_prefix = f"clip_{idx}"
@@ -145,43 +108,68 @@ def run_pipeline(
             int(current_progress),
         )
 
-        # 3a. Extract 16:9 segment
-        raw_clip_path = str(clips_dir / f"{clip_prefix}_raw.mp4")
-        extract_clip_segment(video_path, clip_start, clip_end, raw_clip_path)
+        work_dir = str(clips_dir)
 
-        # 3b. Fast-ASD active speaker tracking
+        # 3a. Extract 16:9 segment (H.264/AAC re-encode for stable OpenCV decoding)
+        report(
+            "extracting",
+            f"Extracting raw segment for clip {idx} ({clip_start}s - {clip_end}s)...",
+            int(current_progress + 2),
+        )
+        ext_vid = extract_segment(video_path, clip, idx, work_dir=work_dir, use_gpu=False)
+
+        # 3b. Fast-ASD multi-speaker tracking & adaptive 9:16 reframing
         report(
             "tracking",
-            f"Running Fast-ASD active speaker detection for clip {idx}...",
-            int(current_progress + 5),
+            f"Running Fast-ASD active speaker tracking & adaptive framing for clip {idx}...",
+            int(current_progress + 8),
         )
-        asd_cache_key = f"{source_fingerprint}_{int(round(clip_start * 1000))}_{int(round(clip_end * 1000))}"
-        tracking_data = asd_manager.detect_active_speakers(raw_clip_path, cache_key=asd_cache_key)
-
-        # 3c. Smooth camera coordinates
-        clip_info = get_video_info(raw_clip_path)
-        smoothed_cx = compute_smoothed_camera_positions(
-            tracking_data,
-            clip_info["frame_count"],
+        trk_vid, chunk_meta = track_speaker_and_frame(
+            clip_file=ext_vid,
+            idx=idx,
+            clip=clip,
+            words=words,
+            work_dir=work_dir,
+            tracker=local_tracker,
+            use_gpu=False,
         )
 
-        # 3d. 9:16 Portrait crop
-        reframed_path = str(clips_dir / f"{clip_prefix}_portrait.mp4")
-        render_portrait_crop(raw_clip_path, reframed_path, smoothed_cx)
-
-        # 3e. Dynamic Subtitles
+        # 3c. Layout-aware ASS Subtitles & SRT
         ass_path = str(clips_dir / f"{clip_prefix}_subtitles.ass")
         srt_path = str(clips_dir / f"{clip_prefix}_subtitles.srt")
-        generate_karaoke_ass(words, clip_start, clip_end, ass_path, preset_name=caption_style)
         generate_srt_subtitles(words, clip_start, clip_end, srt_path)
 
-        final_video_path = reframed_path
-        if burn_subtitles:
-            burned_path = str(clips_dir / f"{clip_prefix}_final.mp4")
-            burn_subtitles_to_video(reframed_path, ass_path, burned_path)
-            final_video_path = burned_path
+        generated_ass = generate_subtitles(
+            words=words,
+            clip=clip,
+            idx=idx,
+            framing_meta=chunk_meta,
+            work_dir=work_dir,
+        )
+        import shutil
+        shutil.copy2(generated_ass, ass_path)
 
-        # 3f. Hook Thumbnail
+        sub_file = generated_ass if burn_subtitles else None
+
+        # 3d. Merge and mux final video
+        report(
+            "rendering",
+            f"Merging audio and burning subtitles for clip {idx}...",
+            int(current_progress + 15),
+        )
+        fonts_dir_str = str(FONTS_DIR) if FONTS_DIR.exists() else ""
+        merge_and_cleanup(
+            tracked_vid=trk_vid,
+            extract_vid=ext_vid,
+            sub_file=sub_file,
+            idx=idx,
+            work_dir=work_dir,
+            use_gpu=False,
+            fonts_dir=fonts_dir_str,
+        )
+        final_video_path = str(clips_dir / f"clip_{idx}.mp4")
+
+        # 3e. Hook Thumbnail
         thumb_path = str(clips_dir / f"{clip_prefix}_thumb.jpg")
         generate_hook_thumbnail(
             final_video_path,

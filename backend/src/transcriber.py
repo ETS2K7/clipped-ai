@@ -188,3 +188,9 @@ def transcribe_video(
         poll_interval = min(poll_interval * 1.3, max_poll_interval)
 
     raise TimeoutError(f"Transcription timed out after {max_attempts} polling attempts")
+
+
+def transcribe(video_path: str, _video_url: str = "", remote_cache=None) -> List[Dict[str, Any]]:
+    """Compatibility wrapper matching Documents/clippedai transcribe signature returning words directly."""
+    result = transcribe_video(video_path, use_cache=True)
+    return result.get("words", [])
