@@ -28,20 +28,32 @@ def _compute_file_sha256(file_path: str) -> str:
 def transcribe_video(
     video_path: str,
     use_cache: bool = True,
+    source_fingerprint: Optional[str] = None,
     on_progress: Optional[callable] = None,
 ) -> Dict[str, Any]:
     """
     Transcribes video speech using AssemblyAI Universal-2 with speaker diarization.
-    Returns word-level timestamps and speaker IDs.
+    Returns word-level timestamps and speaker IDs. Caches results deterministically.
     """
     if not os.path.exists(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    # 1. Fast check: source_fingerprint cache
+    if use_cache and source_fingerprint:
+        fingerprint_cache = TRANSCRIPTS_CACHE_DIR / f"{source_fingerprint}.json"
+        if fingerprint_cache.exists():
+            logger.info("Loaded transcript from fingerprint cache: %s", fingerprint_cache.name)
+            with open(fingerprint_cache, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if on_progress:
+                    on_progress("transcription_complete", "Transcription loaded from cache.")
+                return data
 
     # Extract lightweight audio to minimize upload bandwidth
     if on_progress:
         on_progress("extracting_audio", "Extracting speech audio track...")
 
-    audio_path = extract_audio(video_path)
+    audio_path = extract_audio(video_path, cache_key=source_fingerprint)
     file_hash = _compute_file_sha256(audio_path)
     cache_file = TRANSCRIPTS_CACHE_DIR / f"{file_hash}.json"
 
@@ -49,6 +61,13 @@ def transcribe_video(
         logger.info("Loaded transcript from cache: %s", cache_file.name)
         with open(cache_file, "r", encoding="utf-8") as f:
             data = json.load(f)
+            if source_fingerprint:
+                # also create the fingerprint symlink/file for even faster future hits
+                try:
+                    with open(TRANSCRIPTS_CACHE_DIR / f"{source_fingerprint}.json", "w", encoding="utf-8") as ff:
+                        json.dump(data, ff)
+                except OSError:
+                    pass
             if on_progress:
                 on_progress("transcription_complete", "Transcription loaded from cache.")
             return data
@@ -143,6 +162,13 @@ def transcribe_video(
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(result, f, indent=2)
 
+            if source_fingerprint:
+                try:
+                    with open(TRANSCRIPTS_CACHE_DIR / f"{source_fingerprint}.json", "w", encoding="utf-8") as ff:
+                        json.dump(result, ff, indent=2)
+                except OSError:
+                    pass
+
             logger.info(
                 "Transcription completed: %d words, cached to %s",
                 len(words),
@@ -151,13 +177,6 @@ def transcribe_video(
 
             if on_progress:
                 on_progress("transcription_complete", f"Transcribed {len(words)} words successfully.")
-
-            # Clean up temporary audio file if different from original video
-            if os.path.exists(audio_path) and audio_path != video_path:
-                try:
-                    os.remove(audio_path)
-                except OSError:
-                    pass
 
             return result
 

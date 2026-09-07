@@ -10,8 +10,23 @@ STORAGE_DIR = Path(os.getenv("STORAGE_DIR", str(PROJECT_DIR / "storage"))).resol
 FONTS_DIR = (BACKEND_DIR / "fonts").resolve()
 SAMPLES_DIR = (PROJECT_DIR / "samples").resolve()
 
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
+# Dedicated cache directories for deterministic reuse
+SOURCES_CACHE_DIR = (STORAGE_DIR / "sources").resolve()
+AUDIO_CACHE_DIR = (STORAGE_DIR / "audio_cache").resolve()
+TRANSCRIPTS_CACHE_DIR = (STORAGE_DIR / "transcripts").resolve()
+VIRALITY_CACHE_DIR = (STORAGE_DIR / "virality_cache").resolve()
+ASD_CACHE_DIR = (STORAGE_DIR / "asd_cache").resolve()
+
+for cache_d in (
+    STORAGE_DIR,
+    SAMPLES_DIR,
+    SOURCES_CACHE_DIR,
+    AUDIO_CACHE_DIR,
+    TRANSCRIPTS_CACHE_DIR,
+    VIRALITY_CACHE_DIR,
+    ASD_CACHE_DIR,
+):
+    cache_d.mkdir(parents=True, exist_ok=True)
 
 # Load environment variables
 load_dotenv(BACKEND_DIR / ".env")

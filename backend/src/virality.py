@@ -4,7 +4,12 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 
-from config import get_logger, MIN_CLIP_DURATION, MAX_CLIP_DURATION
+from config import (
+    get_logger,
+    MIN_CLIP_DURATION,
+    MAX_CLIP_DURATION,
+    VIRALITY_CACHE_DIR,
+)
 
 logger = get_logger(__name__)
 
@@ -249,13 +254,29 @@ def _call_gemini_llm(transcript_prompt: str) -> Optional[List[Dict[str, Any]]]:
 def select_viral_clips(
     words: List[Dict[str, Any]],
     user_focus: Optional[str] = None,
+    source_fingerprint: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """
     Selects top viral moments from transcript, snaps them to exact word boundaries,
     and returns rich creator metadata for each clip.
+    Caches selection to avoid unnecessary recomputation for identical inputs.
     """
     if not words:
         return []
+
+    # Check disk cache
+    if source_fingerprint:
+        clean_focus = re.sub(r"\W+", "_", (user_focus or "all").strip().lower())
+        cache_file = VIRALITY_CACHE_DIR / f"{source_fingerprint}_{clean_focus}.json"
+        if cache_file.exists():
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    cached = json.load(f)
+                    if cached:
+                        logger.info("Loaded viral clip selection from cache: %s", cache_file.name)
+                        return cached
+            except Exception as e:
+                logger.warning("Failed to read virality cache: %s", e)
 
     # Build timestamped transcript string
     sentences = _group_into_sentences(words)
@@ -304,4 +325,16 @@ def select_viral_clips(
 
     # Sort by virality score descending
     validated_clips.sort(key=lambda x: x["virality_score"], reverse=True)
-    return validated_clips[:3]
+    selected = validated_clips[:3]
+
+    # Save to disk cache
+    if source_fingerprint and selected:
+        clean_focus = re.sub(r"\W+", "_", (user_focus or "all").strip().lower())
+        cache_file = VIRALITY_CACHE_DIR / f"{source_fingerprint}_{clean_focus}.json"
+        try:
+            with open(cache_file, "w", encoding="utf-8") as f:
+                json.dump(selected, f, indent=2)
+        except OSError:
+            pass
+
+    return selected

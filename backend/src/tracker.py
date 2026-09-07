@@ -71,23 +71,42 @@ class FastASDManager:
         finally:
             os.chdir(original_cwd)
 
-    def detect_active_speakers(self, video_path: str) -> List[Dict[str, Any]]:
+    def detect_active_speakers(
+        self,
+        video_path: str,
+        cache_key: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Runs TalkNet + S3FD on the specified video file.
-        Uses SHA-256 disk cache to skip inference on already processed media.
+        Uses named cache_key and SHA-256 disk cache to skip inference on already processed media.
         """
-        self.initialize()
+        # 1. Fast check: named cache_key
+        if cache_key:
+            named_cache = ASD_CACHE_DIR / f"asd_{cache_key}.json"
+            if named_cache.exists():
+                logger.info("Loaded Fast-ASD tracking from cache: %s", named_cache.name)
+                with open(named_cache, "r", encoding="utf-8") as f:
+                    return json.load(f)
 
+        # 2. File content hash check
         with open(video_path, "rb") as f:
             file_bytes = f.read()
         clip_hash = hashlib.sha256(file_bytes).hexdigest()
         cache_file = ASD_CACHE_DIR / f"asd_{clip_hash}.json"
 
         if cache_file.exists():
-            logger.info("Loaded Fast-ASD tracking from cache: %s", cache_file.name)
+            logger.info("Loaded Fast-ASD tracking from hash cache: %s", cache_file.name)
             with open(cache_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if cache_key:
+                    try:
+                        with open(ASD_CACHE_DIR / f"asd_{cache_key}.json", "w", encoding="utf-8") as ff:
+                            json.dump(data, ff)
+                    except OSError:
+                        pass
+                return data
 
+        self.initialize()
         logger.info("Running Fast-ASD tracking on %s...", video_path)
         original_cwd = os.getcwd()
         try:
@@ -108,6 +127,13 @@ class FastASDManager:
 
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(results, f)
+
+            if cache_key:
+                try:
+                    with open(ASD_CACHE_DIR / f"asd_{cache_key}.json", "w", encoding="utf-8") as ff:
+                        json.dump(results, ff)
+                except OSError:
+                    pass
 
             logger.info("Fast-ASD tracking complete: cached to %s", cache_file.name)
             return results

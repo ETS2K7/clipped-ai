@@ -5,7 +5,12 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List
 
 from config import get_logger, STORAGE_DIR
-from src.downloader import get_video_info, download_youtube, extract_youtube_id
+from src.downloader import (
+    get_video_info,
+    download_youtube,
+    extract_youtube_id,
+    get_source_fingerprint,
+)
 from src.transcriber import transcribe_video
 from src.virality import select_viral_clips
 from src.tracker import (
@@ -26,7 +31,11 @@ def extract_clip_segment(
     end_s: float,
     output_path: str,
 ) -> str:
-    """Extracts a high-quality video subclip using FFmpeg with re-encoding."""
+    """Extracts a high-quality video subclip using FFmpeg with re-encoding. Reuses existing clip if present."""
+    if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+        logger.info("Reusing cached raw subclip: %s", output_path)
+        return output_path
+
     dur = max(1.0, end_s - start_s)
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -77,6 +86,8 @@ def run_pipeline(
     start_time = time.time()
     report("ingesting", "Ingesting source video...", 5)
 
+    source_fingerprint = get_source_fingerprint(video_source)
+
     # 1. Resolve source video (YouTube download or local upload)
     if extract_youtube_id(video_source):
         yt_meta = download_youtube(video_source, output_dir=task_dir / "source")
@@ -94,6 +105,7 @@ def run_pipeline(
     transcript_result = transcribe_video(
         video_path,
         use_cache=True,
+        source_fingerprint=source_fingerprint,
         on_progress=lambda stage, msg: report("transcribing", msg, 35),
     )
     words = transcript_result.get("words", [])
@@ -101,7 +113,11 @@ def run_pipeline(
         raise RuntimeError("Transcription produced no words. Audio may be silent or corrupted.")
 
     report("analyzing", "Identifying high-retention hooks and viral moments...", 45)
-    clips = select_viral_clips(words, user_focus=user_focus)
+    clips = select_viral_clips(
+        words,
+        user_focus=user_focus,
+        source_fingerprint=source_fingerprint,
+    )
     if not clips:
         raise RuntimeError("No suitable viral moments were identified.")
 
@@ -139,7 +155,8 @@ def run_pipeline(
             f"Running Fast-ASD active speaker detection for clip {idx}...",
             int(current_progress + 5),
         )
-        tracking_data = asd_manager.detect_active_speakers(raw_clip_path)
+        asd_cache_key = f"{source_fingerprint}_{int(round(clip_start * 1000))}_{int(round(clip_end * 1000))}"
+        tracking_data = asd_manager.detect_active_speakers(raw_clip_path, cache_key=asd_cache_key)
 
         # 3c. Smooth camera coordinates
         clip_info = get_video_info(raw_clip_path)

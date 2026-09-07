@@ -2,12 +2,20 @@ import os
 import sys
 import re
 import json
+import shutil
+import hashlib
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, Optional
 
 import cv2
-from config import get_logger, STORAGE_DIR, PROJECT_DIR
+from config import (
+    get_logger,
+    STORAGE_DIR,
+    PROJECT_DIR,
+    SOURCES_CACHE_DIR,
+    AUDIO_CACHE_DIR,
+)
 
 logger = get_logger(__name__)
 
@@ -30,6 +38,30 @@ YOUTUBE_URL_REGEX = re.compile(
 def extract_youtube_id(url: str) -> Optional[str]:
     match = YOUTUBE_URL_REGEX.search(url.strip())
     return match.group(5) if match else None
+
+
+def get_source_fingerprint(video_source: str) -> str:
+    """
+    Computes a deterministic, collision-resistant identifier for any video source
+    (YouTube URL or local video file) so downstream stages are cached and reused across runs.
+    """
+    video_source_clean = video_source.strip().strip("\"' ")
+    yt_id = extract_youtube_id(video_source_clean)
+    if yt_id:
+        return f"yt_{yt_id}"
+
+    video_path = Path(video_source_clean).resolve()
+    if not video_path.exists():
+        raise FileNotFoundError(f"Video file not found: {video_source_clean}")
+
+    stat = video_path.stat()
+    hasher = hashlib.sha256()
+    hasher.update(str(video_path).encode("utf-8"))
+    hasher.update(str(stat.st_size).encode("utf-8"))
+    hasher.update(str(stat.st_mtime_ns).encode("utf-8"))
+
+    clean_stem = re.sub(r"[^\w-]", "_", video_path.stem)[:30]
+    return f"local_{clean_stem}_{hasher.hexdigest()[:10]}"
 
 
 def get_video_info(video_path: str) -> Dict[str, Any]:
@@ -56,15 +88,36 @@ def get_video_info(video_path: str) -> Dict[str, Any]:
     }
 
 
-def extract_audio(video_path: str, output_dir: Optional[Path] = None) -> str:
+def extract_audio(
+    video_path: str,
+    output_dir: Optional[Path] = None,
+    cache_key: Optional[str] = None,
+) -> str:
     """
     Extracts a lightweight mono audio payload using FFmpeg.
-    Reduces upload payload to speech services by ~90% (e.g. 150MB video -> ~4MB audio).
+    Reuses cached audio if already extracted to avoid duplicate processing.
     """
     video_path_obj = Path(video_path)
-    target_dir = output_dir or video_path_obj.parent
+    if cache_key:
+        target_dir = output_dir or AUDIO_CACHE_DIR
+        audio_name = f"{cache_key}_audio.ogg"
+        fallback_name = f"{cache_key}_audio.m4a"
+    else:
+        target_dir = output_dir or video_path_obj.parent
+        audio_name = f"{video_path_obj.stem}_audio.ogg"
+        fallback_name = f"{video_path_obj.stem}_audio.m4a"
+
     target_dir.mkdir(parents=True, exist_ok=True)
-    audio_path = str(target_dir / f"{video_path_obj.stem}_audio.ogg")
+    audio_path = str(target_dir / audio_name)
+    fallback_path = str(target_dir / fallback_name)
+
+    # Return cached audio if present and non-empty
+    if os.path.exists(audio_path) and os.path.getsize(audio_path) > 1000:
+        logger.info("Reusing cached audio track: %s", audio_path)
+        return audio_path
+    if os.path.exists(fallback_path) and os.path.getsize(fallback_path) > 1000:
+        logger.info("Reusing cached audio track: %s", fallback_path)
+        return fallback_path
 
     cmd = [
         "ffmpeg", "-y",
@@ -91,7 +144,6 @@ def extract_audio(video_path: str, output_dir: Optional[Path] = None) -> str:
             e.stderr.decode("utf-8", errors="replace")[-300:] if e.stderr else str(e),
         )
 
-        fallback_path = str(target_dir / f"{video_path_obj.stem}_audio.m4a")
         fallback_cmd = [
             "ffmpeg", "-y",
             "-i", video_path,
@@ -107,45 +159,49 @@ def extract_audio(video_path: str, output_dir: Optional[Path] = None) -> str:
 
 def download_youtube(url: str, output_dir: Optional[Path] = None) -> Dict[str, Any]:
     """
-    Downloads YouTube video via yt-dlp, constrained to 1080p max to balance quality and speed.
+    Downloads YouTube video via yt-dlp, constrained to 1080p max.
+    Caches downloads in SOURCES_CACHE_DIR to avoid re-downloading the same video.
     """
     video_id = extract_youtube_id(url)
     if not video_id:
         raise ValueError(f"Invalid YouTube URL: {url}")
 
-    save_dir = output_dir or (STORAGE_DIR / f"yt_{video_id}")
-    save_dir.mkdir(parents=True, exist_ok=True)
+    canonical_dir = SOURCES_CACHE_DIR / f"yt_{video_id}"
+    canonical_dir.mkdir(parents=True, exist_ok=True)
+    canonical_file = canonical_dir / "original.mp4"
 
-    output_template = str(save_dir / "original.%(ext)s")
+    # 1. Check if already present in canonical cache
+    if canonical_file.exists() and canonical_file.stat().st_size > 50000:
+        logger.info("Reusing cached YouTube download: %s", canonical_file)
+    else:
+        output_template = str(canonical_dir / "original.%(ext)s")
+        cmd = [
+            _find_ytdlp(),
+            "--no-playlist",
+            "--format", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            "--merge-output-format", "mp4",
+            "--write-info-json",
+            "--output", output_template,
+            url,
+        ]
 
-    cmd = [
-        _find_ytdlp(),
-        "--no-playlist",
-        "--format", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
-        "--merge-output-format", "mp4",
-        "--write-info-json",
-        "--output", output_template,
-        url,
-    ]
+        logger.info("Downloading YouTube video: %s -> %s", url, canonical_dir)
+        result = subprocess.run(cmd, capture_output=True, text=True)
 
-    logger.info("Downloading YouTube video: %s -> %s", url, save_dir)
-    result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error("yt-dlp error: %s", result.stderr[-1000:])
+            raise RuntimeError(f"Failed to download YouTube video: {result.stderr[-300:]}")
 
-    if result.returncode != 0:
-        logger.error("yt-dlp error: %s", result.stderr[-1000:])
-        raise RuntimeError(f"Failed to download YouTube video: {result.stderr[-300:]}")
-
-    original_file = save_dir / "original.mp4"
-    if not original_file.exists():
-        candidates = list(save_dir.glob("original.*"))
-        candidates = [c for c in candidates if not c.name.endswith(".json")]
-        if candidates:
-            original_file = candidates[0]
-        else:
-            raise FileNotFoundError(f"yt-dlp completed but output file not found in {save_dir}")
+        if not canonical_file.exists():
+            candidates = list(canonical_dir.glob("original.*"))
+            candidates = [c for c in candidates if not c.name.endswith(".json")]
+            if candidates:
+                canonical_file = candidates[0]
+            else:
+                raise FileNotFoundError(f"yt-dlp completed but output file not found in {canonical_dir}")
 
     # Read metadata if info.json was generated
-    info_files = list(save_dir.glob("*.info.json"))
+    info_files = list(canonical_dir.glob("*.info.json"))
     metadata: Dict[str, Any] = {}
     if info_files:
         try:
@@ -154,11 +210,22 @@ def download_youtube(url: str, output_dir: Optional[Path] = None) -> Dict[str, A
         except Exception as e:
             logger.warning("Failed to parse yt-dlp metadata JSON: %s", e)
 
-    video_info = get_video_info(str(original_file))
+    target_file = canonical_file
+    if output_dir and Path(output_dir).resolve() != canonical_dir.resolve():
+        target_dir = Path(output_dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        dest_video = target_dir / canonical_file.name
+        if not dest_video.exists() or dest_video.stat().st_size != canonical_file.stat().st_size:
+            shutil.copy2(canonical_file, dest_video)
+            if info_files:
+                shutil.copy2(info_files[0], target_dir / info_files[0].name)
+        target_file = dest_video
+
+    video_info = get_video_info(str(target_file))
 
     return {
         "video_id": video_id,
-        "video_path": str(original_file),
+        "video_path": str(target_file),
         "title": metadata.get("title", f"YouTube Video {video_id}"),
         "thumbnail_url": metadata.get("thumbnail"),
         "channel": metadata.get("uploader") or metadata.get("channel"),
