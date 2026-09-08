@@ -5,6 +5,8 @@ import re
 import time
 import shutil
 import uuid
+import json
+import subprocess
 from pathlib import Path
 from typing import Dict, Any
 
@@ -28,14 +30,48 @@ from src.pipeline import run_pipeline
 
 def sanitize_filename(name: str) -> str:
     """Sanitizes a string for use as a folder or file name."""
-    clean = re.sub(r'[\\/*?:"<>|]', "", name).strip()
+    if "/" in name or "\\" in name or "." in name:
+        name = Path(name).stem
+    # Strip common channel suffixes like '|', ' - ', or '–'
+    first_part = re.split(r"\s*[|\-–—]\s*", name)[0].strip()
+    target = first_part if len(first_part) >= 4 else name
+    clean = re.sub(r"[\\/*?:\"<>|#%&{}\\<>*?/$!\'\":@+`|=()\[\].]", "", target).strip()
     clean = re.sub(r"\s+", "_", clean)
+    clean = re.sub(r"_+", "_", clean).strip("_")
     return clean[:60] or "video"
 
 
-def write_seo_summary(subfolder: Path, clips: list):
+def get_video_title(video_source: str, is_youtube: bool) -> str:
+    """Gets human-readable title for the video source."""
+    if not is_youtube:
+        return Path(video_source).stem
+    yt_id = extract_youtube_id(video_source)
+    if yt_id:
+        cache_info = ROOT_DIR / "storage" / "sources" / f"yt_{yt_id}" / "original.info.json"
+        if cache_info.exists():
+            try:
+                with open(cache_info, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if data.get("title"):
+                        return data["title"]
+            except Exception:
+                pass
+        try:
+            from src.downloader import _find_ytdlp
+            cmd = [_find_ytdlp(), "--no-playlist", "--print", "title", video_source]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+            if res.returncode == 0 and res.stdout.strip():
+                return res.stdout.strip()
+        except Exception:
+            pass
+        return f"yt_{yt_id}"
+    return "video"
+
+
+
+def write_seo_summary(assets_dir: Path, clips: list):
     """Writes a human-readable text file with social media copy and hashtags."""
-    summary_path = subfolder / "seo_summary.txt"
+    summary_path = assets_dir / "seo_summary.txt"
     lines = [
         "=" * 60,
         "  CLIPPEDAI — CREATOR DISTRIBUTION PACK",
@@ -118,18 +154,15 @@ def main():
     focus_input = input("Specific moment or keyword to prioritize (press Enter to skip): ").strip()
     user_focus = focus_input if focus_input else None
 
-    # 4. Prepare Destination Folder inside test/
-    test_base_dir = ROOT_DIR / "test"
-    test_base_dir.mkdir(parents=True, exist_ok=True)
+    # 4. Prepare Destination Folder inside clips/
+    clips_base_dir = ROOT_DIR / "clips"
+    clips_base_dir.mkdir(parents=True, exist_ok=True)
 
-    if is_youtube:
-        folder_prefix = f"yt_{extract_youtube_id(video_source)}"
-    else:
-        folder_prefix = sanitize_filename(Path(video_source).stem)
+    task_id = f"yt_{extract_youtube_id(video_source)}" if is_youtube else sanitize_filename(Path(video_source).stem)
+    video_title = get_video_title(video_source, is_youtube)
+    folder_name = sanitize_filename(video_title)
 
-    # Use deterministic task_id and subfolder so existing clips are overwritten cleanly
-    task_id = folder_prefix
-    output_subfolder = test_base_dir / folder_prefix
+    output_subfolder = clips_base_dir / folder_name
     is_overwrite = output_subfolder.exists() and any(output_subfolder.iterdir())
     output_subfolder.mkdir(parents=True, exist_ok=True)
 
@@ -166,35 +199,42 @@ def main():
         sys.exit(1)
 
     # 6. Copy Deliverables to Destination Subfolder
+    source_title = pipeline_result.get("source_title")
+    if source_title:
+        refined_folder_name = sanitize_filename(source_title)
+        if refined_folder_name != folder_name and not any(output_subfolder.iterdir()):
+            try:
+                output_subfolder.rmdir()
+            except Exception:
+                pass
+            output_subfolder = clips_base_dir / refined_folder_name
+            output_subfolder.mkdir(parents=True, exist_ok=True)
+
+    assets_subfolder = output_subfolder / "assets"
+    assets_subfolder.mkdir(parents=True, exist_ok=True)
+
     generated_clips = pipeline_result.get("clips", [])
     final_clips_info = []
 
     for clip in generated_clips:
         idx = clip["index"]
-        clip_name = f"clip_{idx}"
 
-        # Copy video
-        dest_video = output_subfolder / f"{clip_name}_final.mp4"
+        # Copy only the vertical video clip
+        dest_video = output_subfolder / f"clip_{idx}.mp4"
         shutil.copy2(clip["video_path"], dest_video)
 
-        # Copy thumbnail
-        dest_thumb = output_subfolder / f"{clip_name}_thumb.jpg"
-        shutil.copy2(clip["thumbnail_path"], dest_thumb)
-
-        # Copy subtitles (.ass and .srt)
-        dest_ass = output_subfolder / f"{clip_name}_subtitles.ass"
-        shutil.copy2(clip["ass_path"], dest_ass)
-        dest_srt = output_subfolder / f"{clip_name}_subtitles.srt"
-        shutil.copy2(clip["srt_path"], dest_srt)
+        # Copy thumbnail to assets/
+        if clip.get("thumbnail_path") and os.path.exists(clip["thumbnail_path"]):
+            dest_thumb = assets_subfolder / f"clip_{idx}_thumb.jpg"
+            shutil.copy2(clip["thumbnail_path"], dest_thumb)
 
         final_clips_info.append({
             **clip,
             "dest_video": str(dest_video),
-            "dest_thumb": str(dest_thumb),
         })
 
-    # Write social media summary pack
-    write_seo_summary(output_subfolder, generated_clips)
+    # Save social media copy and hashtags into assets/
+    write_seo_summary(assets_subfolder, generated_clips)
 
     # 7. Print Completion Summary Table
     print("\n" + "=" * 60)
@@ -214,8 +254,10 @@ def main():
         print(f"{c['index']:<3} {score_badge:<12} {hook_name:<20} {dur_str:<10} {title_trunc}")
 
     print("-" * 75)
-    print(f"\nAll vertical clips, hook thumbnails, and SEO packages saved to:")
+    print(f"\nAll vertical clips saved to:")
     print(f"👉 {output_subfolder.resolve()}\n")
+    print(f"Thumbnails and SEO pack saved to:")
+    print(f"📁 {assets_subfolder.resolve()}\n")
     print(f"To view files in Finder, run: open '{output_subfolder.resolve()}'\n")
 
 

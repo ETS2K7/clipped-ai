@@ -57,42 +57,22 @@ def generate_hook_thumbnail(
     img = Image.fromarray(rgb_frame)
     draw = ImageDraw.Draw(img, "RGBA")
 
-    # Add dark vignette gradient at top and bottom for text legibility
+    # Add subtle vignette gradient at top and bottom for text legibility
     vignette = Image.new("RGBA", (OUT_WIDTH, OUT_HEIGHT), (0, 0, 0, 0))
     vignette_draw = ImageDraw.Draw(vignette)
 
     # Top gradient
     for y in range(400):
-        alpha = int(180 * (1.0 - (y / 400.0)))
+        alpha = int(140 * (1.0 - (y / 400.0)))
         vignette_draw.line([(0, y), (OUT_WIDTH, y)], fill=(0, 0, 0, alpha))
 
     # Bottom gradient
-    for y in range(OUT_HEIGHT - 600, OUT_HEIGHT):
-        alpha = int(220 * ((y - (OUT_HEIGHT - 600)) / 600.0))
+    for y in range(OUT_HEIGHT - 500, OUT_HEIGHT):
+        alpha = int(180 * ((y - (OUT_HEIGHT - 500)) / 500.0))
         vignette_draw.line([(0, y), (OUT_WIDTH, y)], fill=(0, 0, 0, alpha))
 
     img = Image.alpha_composite(img.convert("RGBA"), vignette)
     draw = ImageDraw.Draw(img)
-
-    # Load custom font or fallback
-    try:
-        font_large = ImageFont.truetype(str(DEFAULT_FONT_PATH), 86)
-        font_small = ImageFont.truetype(str(DEFAULT_FONT_PATH), 36)
-    except Exception:
-        font_large = ImageFont.load_default()
-        font_small = ImageFont.load_default()
-
-    # Draw Virality Score Badge in top left
-    badge_text = f"🔥 {virality_score}/100 VIRAL POTENTIAL"
-    badge_x, badge_y = 60, 80
-    draw.rounded_rectangle(
-        [badge_x, badge_y, badge_x + 580, badge_y + 64],
-        radius=32,
-        fill=(0, 0, 0, 220),
-        outline=(255, 215, 0, 255),
-        width=3,
-    )
-    draw.text((badge_x + 36, badge_y + 14), badge_text, font=font_small, fill=(255, 255, 255, 255))
 
     # Format hook text into 2-3 short, bold lines
     words = hook_text.upper().split()
@@ -110,10 +90,32 @@ def generate_hook_thumbnail(
     # Keep at most top 3 lines
     lines = lines[:3]
 
-    # Draw centered hook text near the upper-middle third (Y: 480-700)
-    start_y = 520
-    line_spacing = 110
+    font_size = 86
+    try:
+        font_large = ImageFont.truetype(str(DEFAULT_FONT_PATH), font_size)
+    except Exception:
+        font_large = ImageFont.load_default()
 
+    # Auto-scale font size if any line exceeds frame width
+    if lines:
+        max_w = max(
+            draw.textbbox((0, 0), l, font=font_large)[2] - draw.textbbox((0, 0), l, font=font_large)[0]
+            for l in lines
+        )
+        if max_w > (OUT_WIDTH - 120):
+            scale = (OUT_WIDTH - 120) / max_w
+            font_size = max(52, int(font_size * scale))
+            try:
+                font_large = ImageFont.truetype(str(DEFAULT_FONT_PATH), font_size)
+            except Exception:
+                font_large = ImageFont.load_default()
+
+    # Center hook text vertically and horizontally on the 9:16 portrait frame
+    line_spacing = int(font_size * 1.28)
+    total_text_h = (len(lines) - 1) * line_spacing + font_size
+    start_y = (OUT_HEIGHT - total_text_h) // 2
+
+    outline_w = 8
     for idx, line in enumerate(lines):
         # Calculate text bounding box to center horizontally
         bbox = draw.textbbox((0, 0), line, font=font_large)
@@ -125,7 +127,6 @@ def generate_hook_thumbnail(
         fill_color = (255, 255, 0, 255) if idx == 1 else (255, 255, 255, 255)
 
         # Thick black outline for pop
-        outline_w = 7
         for ox in range(-outline_w, outline_w + 1):
             for oy in range(-outline_w, outline_w + 1):
                 if ox != 0 or oy != 0:

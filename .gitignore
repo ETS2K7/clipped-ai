@@ -19,6 +19,7 @@ storage/
 output/
 temp/
 test/
+clips/
 *.mp4
 *.avi
 *.ogg

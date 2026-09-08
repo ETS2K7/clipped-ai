@@ -122,11 +122,11 @@ HOST=0.0.0.0
 ### 3. Running the Pipeline
 You can run ClippedAI via the interactive CLI or the API server:
 
-**Option A: Interactive Creator CLI (Generates Video, Thumbnails & SEO Packs)**
+**Option A: Interactive Creator CLI (Generates 9:16 Video Clips)**
 ```bash
 ./cli.py
 ```
-Generated 9:16 clips, hook thumbnails, subtitle files, and the Creator SEO Pack will be automatically saved into individual subfolders inside `test/`.
+Generated 9:16 viral video clips will be saved cleanly into individual subfolders inside `clips/` (e.g. `clips/Biggest_Lies_Employees_Are_Told_During_Promotions/clip_1.mp4`), with hook thumbnails and creator SEO packages neatly separated in `assets/`.
 
 **Option B: Run the API Server**
 ```bash
