@@ -22,6 +22,9 @@ test/
 clips/
 *.mp4
 *.avi
+*.mov
+*.mkv
+*.webm
 *.ogg
 *.wav
 *.ass
