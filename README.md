@@ -23,8 +23,8 @@
 - [5. Installation & Local Setup Guide](#5-installation--local-setup-guide)
 - [6. How to Run the Pipeline](#6-how-to-run-the-pipeline)
 - [7. Deliverable File Structure](#7-deliverable-file-structure)
-- [8. Judge's Evaluation Checklist](#8-judges-evaluation-checklist)
-- [9. Technical Specifications & Stack](#9-technical-specifications--stack)
+- [8. Technical Specifications & Stack](#8-technical-specifications--stack)
+- [9. API Server (Alternative to CLI)](#9-api-server-alternative-to-cli)
 
 ---
 
@@ -328,28 +328,7 @@ Tags:    #reels #careeradvice #workplace #mindset
 
 ---
 
-## 8. Judge's Evaluation Checklist
-
-When evaluating ClippedAI's output, we invite judges to inspect the following technical attributes across the generated clips:
-
-- [ ] **1. Camera Stability (Zero Micro-Jitter):**  
-  Play any generated clip (e.g. `clips/Biggest_Lies_Employees_Are_Told_During_Promotions/clip_1.mp4`). Note that while the speaker is talking in place, the camera does **not** wander, wobble, or jitter. The stationary cluster lock keeps the frame rock-solid.
-- [ ] **2. Clean Snap-Cuts on Speaker Turns:**  
-  Observe scenes where dialogue alternates between participants. Notice that the camera snaps cleanly and instantly between speakers without nauseating slow pans across the frame.
-- [ ] **3. Adaptive Multi-Speaker Split Framing:**  
-  In clips with rapid banter or crosstalk, notice how the engine transitions into stacked vertical splits (1080×960 per cell) with natural vertical headroom ($cy = 0.42$).
-- [ ] **4. Layout-Aware Subtitle Collision Avoidance:**  
-  Inspect the subtitle positioning. In single-speaker shots, captions reside comfortably in the lower third. In split-screen shots, captions reposition automatically to the center seam (`y = 960`), avoiding speaker faces entirely.
-- [ ] **5. Kinetic Neon Hormozi Typography:**  
-  Notice the word-level synchronized karaoke highlight effect, bold outlines, and high-visibility yellow/green color alternation that snaps to exact spoken breath boundaries.
-- [ ] **6. High-CTR Hook Thumbnails:**  
-  Open `assets/clip_1_thumb.jpg`. Notice the centered bold hook typography, dark gradient contrast vignettes, and auto-scaled text dimensions designed for maximum click-through rates.
-- [ ] **7. Sub-Second Pipeline Caching:**  
-  Execute `./cli.py` a second time using the same YouTube URL. Observe how the pipeline verifies existing cache fingerprints and completes almost instantaneously.
-
----
-
-## 9. Technical Specifications & Stack
+## 8. Technical Specifications & Stack
 
 | Subsystem | Technologies & Libraries | Key Responsibilities |
 | :--- | :--- | :--- |
@@ -363,7 +342,7 @@ When evaluating ClippedAI's output, we invite judges to inspect the following te
 
 ---
 
-## 10. API Server (Alternative to CLI)
+## 9. API Server (Alternative to CLI)
 
 In addition to `./cli.py`, ClippedAI includes a full FastAPI server with Server-Sent Events (SSE) for programmatic integrations:
 
