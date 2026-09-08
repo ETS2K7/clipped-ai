@@ -3,7 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ClippedAI — Technical Architecture & Pipeline Walkthrough</title>
+  <title>ClippedAI — Autonomous AI Content Engine</title>
+  <meta name="description" content="Autonomous AI Content Engine converting horizontal videos into viral 9:16 vertical clips with active speaker detection, dynamic framing, and kinetic subtitles.">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ets2k7.github.io/clipped-ai/">
+  <meta property="og:title" content="ClippedAI — Autonomous AI Content Engine">
+  <meta property="og:description" content="Transforms long-form videos into viral 9:16 vertical clips with lip-sync active speaker detection, zero-jitter camera stabilization, adaptive split layouts, and multi-platform SEO packaging.">
+  <meta property="og:image" content="https://ets2k7.github.io/clipped-ai/media/showcase_banner.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://ets2k7.github.io/clipped-ai/">
+  <meta name="twitter:title" content="ClippedAI — Autonomous AI Content Engine">
+  <meta name="twitter:description" content="Transforms long-form videos into viral 9:16 vertical clips with lip-sync active speaker detection, zero-jitter camera stabilization, adaptive split layouts, and multi-platform SEO packaging.">
+  <meta name="twitter:image" content="https://ets2k7.github.io/clipped-ai/media/showcase_banner.png">
+
   <link rel="icon" type="image/png" sizes="32x32" href="media/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="180x180" href="media/favicon.png">
   <link rel="apple-touch-icon" href="media/favicon.png">
@@ -283,6 +301,7 @@
       display: flex;
       gap: var(--spacing-md);
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .button-primary {
@@ -424,11 +443,13 @@
       background-color: var(--canvas);
       border: 1px solid var(--hairline-soft);
       border-radius: var(--rounded-md);
-      overflow: hidden;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
 
     table.compare-table {
       width: 100%;
+      min-width: 680px;
       border-collapse: collapse;
       text-align: left;
       font-size: 14px;
@@ -640,6 +661,95 @@
       white-space: nowrap;
     }
 
+    /* Creator Pack Deliverables */
+    .deliverables-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: var(--spacing-xxl);
+      align-items: start;
+    }
+
+    .pack-preview-col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    .thumb-card {
+      background-color: var(--canvas-soft);
+      border: 1px solid var(--hairline-soft);
+      border-radius: var(--rounded-md);
+      overflow: hidden;
+      padding: var(--spacing-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-sm);
+    }
+
+    .thumb-card img {
+      width: 100%;
+      aspect-ratio: 9 / 16;
+      max-height: 420px;
+      object-fit: cover;
+      border-radius: var(--rounded-sm);
+      display: block;
+    }
+
+    .thumb-caption {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .social-copy-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+    }
+
+    .social-copy-card {
+      background-color: var(--canvas-soft);
+      border: 1px solid var(--hairline-soft);
+      border-radius: var(--rounded-md);
+      padding: var(--spacing-lg) var(--spacing-xl);
+    }
+
+    .social-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .social-platform-badge {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 10px;
+      border-radius: var(--rounded-full);
+      background-color: var(--ink);
+      color: var(--on-primary);
+    }
+
+    .social-field {
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--ink);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .social-field strong {
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-right: 6px;
+    }
+
+    .social-field:last-child {
+      margin-bottom: 0;
+    }
+
     /* Code Blocks */
     .code-card {
       background-color: var(--canvas-soft);
@@ -755,6 +865,7 @@
       h1.hero-title { font-size: 38px; }
       .grid-3, .grid-2 { grid-template-columns: 1fr; }
       .showcase-container { grid-template-columns: 1fr; padding: var(--spacing-lg); }
+      .deliverables-grid { grid-template-columns: 1fr; }
       .video-frame { max-width: 320px; margin: 0 auto; height: auto; }
       .step-card { grid-template-columns: 1fr; gap: var(--spacing-sm); }
       .footer-top { flex-direction: column; gap: var(--spacing-xl); }
@@ -774,6 +885,7 @@
         <a href="#overview" class="nav-link">Overview</a>
         <a href="#differentiators" class="nav-link">Differentiators</a>
         <a href="#showcase" class="nav-link">Clip Showcase</a>
+        <a href="#deliverables" class="nav-link">Deliverables</a>
         <a href="#pipeline" class="nav-link">Architecture</a>
         <a href="#engineering" class="nav-link">Deep Dive</a>
         <a href="#quickstart" class="nav-link">Quickstart</a>
@@ -816,6 +928,7 @@
           <div class="hero-actions">
             <a href="#showcase" class="button-primary">Experience the Output ↓</a>
             <a href="https://github.com/ETS2K7/clipped-ai" class="button-outline" target="_blank" rel="noopener">Inspect Repository ↗</a>
+            <a href="https://ai-content-engine-hacks.devpost.com/" class="button-outline" target="_blank" rel="noopener">Devpost Submission ↗</a>
           </div>
         </div>
 
@@ -1004,6 +1117,73 @@
       </div>
     </section>
 
+    <!-- Creator Distribution Pack Deliverables Section -->
+    <section id="deliverables">
+      <div class="section-header">
+        <div class="section-tag">End-to-End Deliverables</div>
+        <h2 class="section-heading">The complete creator distribution pack.</h2>
+        <p class="section-desc">ClippedAI is not just a video cropper—it is an autonomous content engine. Each run produces a fully isolated bundle containing ready-to-publish vertical clips, CTR hook thumbnails, and multi-platform SEO packaging.</p>
+      </div>
+
+      <div class="deliverables-grid">
+        <!-- Thumbnail & Directory Preview Column -->
+        <div class="pack-preview-col">
+          <div class="thumb-card">
+            <img src="media/how_i_boost_thumb_2.jpg" alt="Generated Hook Thumbnail" loading="lazy">
+            <div class="thumb-caption">
+              <strong>Auto-Generated Hook Thumbnail:</strong> High-contrast typography, centered hook phrasing, and gradient dark vignettes engineered for maximum click-through rates.
+            </div>
+          </div>
+
+          <div class="code-card" style="margin-top: 0;">
+            <div class="code-card-header">Directory Output Structure</div>
+            <pre><code>clips/How_I_bootstrapped.../
+├── clip_1.mp4  # Clean 9:16 video
+├── clip_2.mp4  # Clean 9:16 video
+└── assets/
+    ├── clip_1_thumb.jpg
+    ├── clip_1_metadata.json
+    └── clip_1_distribution_pack.txt</code></pre>
+          </div>
+        </div>
+
+        <!-- Multi-Platform Social Copy Stack -->
+        <div class="social-copy-stack">
+          <!-- YouTube Shorts Card -->
+          <div class="social-copy-card">
+            <div class="social-card-header">
+              <span class="social-platform-badge">YouTube Shorts</span>
+              <span style="font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">clip_1_distribution_pack.txt</span>
+            </div>
+            <div class="social-field"><strong>Title:</strong> The Promotion Trap Nobody Warns You About</div>
+            <div class="social-field"><strong>Caption:</strong> The real reason high performers get passed over for promotions. Watch till the end. #shorts #careeradvice #corporate</div>
+            <div class="social-field"><strong>Tags:</strong> <code>promotions</code>, <code>career advice</code>, <code>corporate ladder</code>, <code>workplace tips</code></div>
+          </div>
+
+          <!-- TikTok Card -->
+          <div class="social-copy-card">
+            <div class="social-card-header">
+              <span class="social-platform-badge">TikTok</span>
+              <span style="font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">clip_1_distribution_pack.txt</span>
+            </div>
+            <div class="social-field"><strong>Caption:</strong> Biggest lies employees are told during promotions 🤯 Wait till the end! #fyp #career #entrepreneur</div>
+            <div class="social-field"><strong>Sound:</strong> Trending Speech Audio / Original Sound</div>
+          </div>
+
+          <!-- Instagram Reels Card -->
+          <div class="social-copy-card">
+            <div class="social-card-header">
+              <span class="social-platform-badge">Instagram Reels</span>
+              <span style="font-size: 12px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">clip_1_distribution_pack.txt</span>
+            </div>
+            <div class="social-field"><strong>Caption:</strong> Biggest lies employees are told during promotions. Drop your honest thoughts below 👇</div>
+            <div class="social-field"><strong>CTA:</strong> Save this for your next performance review!</div>
+            <div class="social-field"><strong>Tags:</strong> <code>#reels</code> <code>#careeradvice</code> <code>#workplace</code> <code>#mindset</code></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Architecture Section -->
     <section id="pipeline">
       <div class="section-header">
@@ -1112,26 +1292,46 @@ CROP_H_HALF = int(round(CROP_W_1 * h_half / OUT_W))  # 541px
     <section id="quickstart">
       <div class="section-header">
         <div class="section-tag">Quickstart</div>
-        <h2 class="section-heading">Local installation & execution.</h2>
-        <p class="section-desc">Run ClippedAI locally on macOS (Apple Silicon MPS) or Linux (CPU/CUDA).</p>
+        <h2 class="section-heading">Local installation & dual interfaces.</h2>
+        <p class="section-desc">Run ClippedAI locally on macOS (Apple Silicon MPS) or Linux (CPU/CUDA) via the interactive terminal CLI or as a background FastAPI server.</p>
       </div>
 
       <div class="code-card" style="margin-bottom: var(--spacing-lg);">
-        <div class="code-card-header">Terminal — Setup & Execution</div>
-        <pre><code># 1. Clone repository
-git clone https://github.com/ETS2K7/clipped-ai.git
-cd clipped-ai
-
-# 2. Setup Virtual Environment
-python3 -m venv venv
-source venv/bin/activate
+        <div class="code-card-header">1. Environment Setup</div>
+        <pre><code>git clone https://github.com/ETS2K7/clipped-ai.git && cd clipped-ai
+python3 -m venv venv && source venv/bin/activate
 pip install -r backend/requirements.txt
+cp .env.example backend/.env  # configure API keys</code></pre>
+      </div>
 
-# 3. Configure API Keys
-cp .env.example backend/.env
+      <div class="grid-2">
+        <div class="feature-card soft">
+          <h3>Option A: Interactive Pipeline CLI</h3>
+          <p>Terminal workflow with colored stage trackers, automatic video extension resolution, and direct output packaging.</p>
+          <div class="code-card">
+            <div class="code-card-header">Terminal — CLI</div>
+            <pre><code># Run interactive CLI
+./cli.py
 
-# 4. Run Interactive Pipeline CLI
-./cli.py</code></pre>
+# Or pass a URL directly
+./cli.py --url "https://youtu.be/..."</code></pre>
+          </div>
+        </div>
+
+        <div class="feature-card soft">
+          <h3>Option B: FastAPI REST & SSE Server</h3>
+          <p>Production server with OpenAPI docs, non-blocking asynchronous task execution, and real-time Server-Sent Events (SSE) streaming.</p>
+          <div class="code-card">
+            <div class="code-card-header">Terminal — Backend Server</div>
+            <pre><code># Start FastAPI server
+./backend/run.sh
+
+# Interactive Docs: http://localhost:8000/docs
+# Health Check:     GET  /health
+# Submit Task:      POST /api/process
+# SSE Stream:       GET  /api/progress/{task_id}</code></pre>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1151,7 +1351,8 @@ cp .env.example backend/.env
             <div class="footer-col-title">Project</div>
             <a href="https://github.com/ETS2K7/clipped-ai" target="_blank" rel="noopener">GitHub Repository</a>
             <a href="https://ai-content-engine-hacks.devpost.com/" target="_blank" rel="noopener">Devpost Hackathon</a>
-            <a href="#overview">Architecture</a>
+            <a href="#deliverables">Creator Pack</a>
+            <a href="#pipeline">Architecture</a>
           </div>
 
           <div class="footer-col">
