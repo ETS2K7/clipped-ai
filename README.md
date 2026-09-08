@@ -97,8 +97,8 @@ graph TD
 ### 1. Setup Environment
 ```bash
 # Clone the repository
-git clone https://github.com/ETS2K7/ClippedAI.git
-cd ClippedAI
+git clone https://github.com/ETS2K7/clipped-ai.git
+cd clipped-ai
 
 # Install dependencies
 pip install -r backend/requirements.txt
