@@ -281,38 +281,6 @@
       display: block;
     }
 
-    .hero-phone-header {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      right: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(20, 20, 20, 0.75);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border-radius: var(--rounded-full);
-      padding: 5px 12px;
-      font-size: 11px;
-      font-weight: 600;
-      color: #fff;
-      z-index: 2;
-    }
-
-    .hero-phone-header .live-indicator {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .hero-phone-header .live-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background-color: #0066ff;
-    }
-
     .hero-phone-caption {
       margin-top: 10px;
       font-size: 12px;
@@ -521,6 +489,12 @@
     }
 
     /* Video Player Showcase */
+    .showcase-stack {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xxl);
+    }
+
     .showcase-container {
       background-color: var(--canvas-soft);
       border-radius: var(--rounded-md);
@@ -842,17 +816,13 @@
         <!-- Above-The-Fold Live Output Preview -->
         <div class="hero-preview-col">
           <div class="hero-phone-card">
-            <div class="hero-phone-header">
-              <span class="live-indicator"><span class="live-dot"></span> Live Render Output</span>
-              <span>1080×1920</span>
-            </div>
-            <video autoplay muted loop playsinline controls poster="media/sample_thumb.jpg">
-              <source src="media/sample_clip.mp4" type="video/mp4">
+            <video autoplay muted loop playsinline controls poster="media/off_campus_thumb.jpg">
+              <source src="media/off_campus_clip_3.mp4" type="video/mp4">
               Your browser does not support video playback.
             </video>
           </div>
           <div class="hero-phone-caption">
-            Autonomous 9:16 crop • Active speaker tracking • Kinetic subtitles
+            Autonomous 9:16 crop • Adaptive vertical split • Seam-anchored typography
           </div>
         </div>
       </div>
@@ -953,39 +923,75 @@
     <!-- Live Output Showcase -->
     <section id="showcase">
       <div class="section-header">
-        <div class="section-tag">Live Output</div>
         <h2 class="section-heading">Experience the generated clips.</h2>
-        <p class="section-desc">The actual output produced by the ClippedAI pipeline from a real full-length podcast interview.</p>
+        <p class="section-desc">The actual output produced by the ClippedAI pipeline from real full-length podcast interviews.</p>
       </div>
 
-      <div class="showcase-container">
-        <div class="video-frame">
-          <video controls poster="media/sample_thumb.jpg">
-            <source src="media/sample_clip.mp4" type="video/mp4">
-            Your browser does not support video playback.
-          </video>
+      <div class="showcase-stack">
+        <!-- Showcase Card 1: How I Bootstrapped (Active Moving Speaker Smooth Tracking) -->
+        <div class="showcase-container">
+          <div class="video-frame">
+            <video controls poster="media/how_i_boost_thumb_2.jpg">
+              <source src="media/how_i_boost_clip_2.mp4" type="video/mp4">
+              Your browser does not support video playback.
+            </video>
+          </div>
+
+          <div class="showcase-content">
+            <span class="badge-featured">90/100 Viral Score • Relatable Struggle Hook</span>
+            <h3 class="showcase-title">Stepping Off the Conveyor Belt.</h3>
+            <p class="showcase-desc">
+              Source: YouTube URL (How I bootstrapped and sold an app worth millions at 18).<br>
+              Processed autonomously through dynamic Active Speaker Detection, smooth velocity-dampened motion tracking, and Hormozi neon kinetic subtitles.
+            </p>
+
+            <div class="inspection-points">
+              <div class="point-item">
+                <div class="point-bullet">1</div>
+                <div><strong>Smooth Dynamic Motion Tracking:</strong> The active speaker is actively walking and gesturing across the stage while ClippedAI smoothly tracks their motion in real time.</div>
+              </div>
+              <div class="point-item">
+                <div class="point-bullet">2</div>
+                <div><strong>Velocity-Dampened Panning:</strong> Continuous EMA smoothing prevents nauseating camera micro-wander while panning fluidly with the speaker's movement.</div>
+              </div>
+              <div class="point-item">
+                <div class="point-bullet">3</div>
+                <div><strong>AR-Safe Headroom Balance:</strong> Retains natural eye-line headroom ($cy = 0.42$) in 1080×1920 portrait format even during rapid postural shifts.</div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="showcase-content">
-          <span class="badge-featured">80/100 Viral Score • Multi-Speaker Banter</span>
-          <h3 class="showcase-title">Grandma Cardigans & Brains (Playground Insults).</h3>
-          <p class="showcase-desc">
-            Source: YouTube URL (Chris Hemsworth & Scarlett Johansson Insult Each Other | BBC Radio 1).<br>
-            Processed autonomously from raw URL through multi-speaker Active Speaker Detection (Fast-ASD), adaptive split-framing, seam-anchored subtitles, and SEO packaging.
-          </p>
+        <!-- Showcase Card 2: Off-Campus Cast (Multi-Speaker Split) -->
+        <div class="showcase-container">
+          <div class="video-frame">
+            <video controls poster="media/off_campus_thumb.jpg">
+              <source src="media/off_campus_clip_3.mp4" type="video/mp4">
+              Your browser does not support video playback.
+            </video>
+          </div>
 
-          <div class="inspection-points">
-            <div class="point-item">
-              <div class="point-bullet">1</div>
-              <div><strong>Adaptive Split Layout:</strong> Stacks Chris Hemsworth and Scarlett Johansson vertically (1080×960 each) during conversational banter without cutoffs.</div>
-            </div>
-            <div class="point-item">
-              <div class="point-bullet">2</div>
-              <div><strong>Seam-Anchored Neon Typography:</strong> Subtitles dynamically anchor on the center dividing seam (<code>\an5\pos(540,960)</code>), keeping both speakers' faces visible.</div>
-            </div>
-            <div class="point-item">
-              <div class="point-bullet">3</div>
-              <div><strong>Lip-Sync Active Speaker Detection:</strong> Fast-ASD cross-attention isolates speaking faces in real time, avoiding false pans to silent reactions.</div>
+          <div class="showcase-content">
+            <span class="badge-featured">80/100 Viral Score • Hypothetical Question</span>
+            <h3 class="showcase-title">Fake Dating to Find Love? No Way!</h3>
+            <p class="showcase-desc">
+              Source: YouTube URL (Off-Campus Cast Ask Rapid).<br>
+              Processed autonomously from raw URL through multi-speaker Active Speaker Detection (Fast-ASD), adaptive split-framing, seam-anchored subtitles, and SEO packaging.
+            </p>
+
+            <div class="inspection-points">
+              <div class="point-item">
+                <div class="point-bullet">1</div>
+                <div><strong>Adaptive Split Layout:</strong> Seamlessly stacks both interview subjects vertically (1080×960 each) to preserve dialogue chemistry and reactions.</div>
+              </div>
+              <div class="point-item">
+                <div class="point-bullet">2</div>
+                <div><strong>Seam-Anchored Neon Typography:</strong> Subtitles dynamically anchor on the center dividing seam (<code>\an5\pos(540,960)</code>), preventing overlap with either speaker's face.</div>
+              </div>
+              <div class="point-item">
+                <div class="point-bullet">3</div>
+                <div><strong>Lip-Sync Active Speaker Detection:</strong> Fast-ASD cross-modal attention identifies the active speaker in real time with zero horizontal camera jitter.</div>
+              </div>
             </div>
           </div>
         </div>
