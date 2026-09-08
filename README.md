@@ -2,12 +2,15 @@
 
 > **Autonomous AI Content Engine that transforms long-form horizontal videos into viral, platform-ready 9:16 vertical clips with active speaker tracking, word-synced kinetic subtitles, hook thumbnails, and multi-platform SEO distribution packages.**
 
+[![Live Walkthrough & Demo](https://img.shields.io/badge/Live%20Docs%20%26%20Walkthrough-ets2k7.github.io%2Fclipped--ai-38bdf8.svg?style=flat-square&logo=githubpages&logoColor=white)](https://ets2k7.github.io/clipped-ai/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB.svg?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch 2.2+](https://img.shields.io/badge/PyTorch-2.2+-EE4C2C.svg?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-009688.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![FFmpeg](https://img.shields.io/badge/FFmpeg-6.0+-007808.svg?style=flat-square&logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
 [![Fast-ASD](https://img.shields.io/badge/Computer%20Vision-Fast--ASD%20TalkNet-blueviolet.svg?style=flat-square)]()
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)]()
+
+👉 **Live Visual Presentation & Clip Showcase:** **[https://ets2k7.github.io/clipped-ai/](https://ets2k7.github.io/clipped-ai/)**
 
 ---
 
