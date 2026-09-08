@@ -26,6 +26,7 @@ clips/
 *.wav
 *.ass
 *.srt
+!docs/media/*
 
 # Model weights
 *.pth

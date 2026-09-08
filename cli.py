@@ -258,7 +258,8 @@ def main():
     print(f"👉 {output_subfolder.resolve()}\n")
     print(f"Thumbnails and SEO pack saved to:")
     print(f"📁 {assets_subfolder.resolve()}\n")
-    print(f"To view files in Finder, run: open '{output_subfolder.resolve()}'\n")
+    print(f"To view files in Finder, run: open '{output_subfolder.resolve()}'")
+    print(f"To view visual documentation, run: open 'docs/index.html'\n")
 
 
 if __name__ == "__main__":

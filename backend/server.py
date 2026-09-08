@@ -34,6 +34,14 @@ app.add_middleware(
 # Mount storage directory for static media serving (clips, thumbnails, subtitles)
 app.mount("/media", StaticFiles(directory=str(STORAGE_DIR)), name="media")
 
+DOCS_DIR = (BACKEND_DIR.parent / "docs").resolve()
+if DOCS_DIR.exists():
+    app.mount("/docs-visual", StaticFiles(directory=str(DOCS_DIR), html=True), name="docs-visual")
+
+CLIPS_DIR = (BACKEND_DIR.parent / "clips").resolve()
+if CLIPS_DIR.exists():
+    app.mount("/clips", StaticFiles(directory=str(CLIPS_DIR)), name="clips")
+
 # In-memory task state tracking
 tasks_state: Dict[str, Dict[str, Any]] = {}
 task_progress_queues: Dict[str, asyncio.Queue] = {}
