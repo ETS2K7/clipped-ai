@@ -50,7 +50,7 @@ Short-form vertical video is the dominant growth vector on modern social platfor
 
 ## 2. The ClippedAI Differentiator Matrix
 
-Most hackathon projects and toy clipping scripts perform static center crops, hardcode single-speaker zooms, or slap uncontrolled Whisper subtitles onto video. ClippedAI is engineered as a robust, production-grade video intelligence engine:
+Most toy clipping scripts and naive open-source wrappers perform static center crops, hardcode single-speaker zooms, or slap uncontrolled Whisper subtitles onto video. ClippedAI is engineered as a robust, production-grade video intelligence engine:
 
 | Capability | Naive / Toy Clipping Scripts | ClippedAI Production Pipeline |
 | :--- | :--- | :--- |
@@ -360,6 +360,6 @@ In addition to `./cli.py`, ClippedAI includes a full FastAPI server with Server-
 ---
 
 <div align="center">
-  <b>Built for the AI Content Engine Hackathon</b><br>
+  <b>ClippedAI — Autonomous AI Content Engine</b><br>
   <sub>Engineered for autonomous creator distribution with production-grade reliability.</sub>
 </div>
