@@ -422,14 +422,16 @@
     /* Cards & Grids */
     .grid-3 {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: var(--spacing-lg);
+      width: 100%;
     }
 
     .grid-2 {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: var(--spacing-lg);
+      width: 100%;
     }
 
     .feature-card {
@@ -440,6 +442,9 @@
       display: flex;
       flex-direction: column;
       gap: var(--spacing-md);
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .feature-card.soft {
@@ -678,6 +683,10 @@
       border-radius: var(--rounded-md);
       padding: var(--spacing-lg) var(--spacing-xl);
       margin-top: var(--spacing-md);
+      min-width: 0;
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
     }
 
     .code-card-header {
@@ -692,10 +701,12 @@
 
     pre {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 13.5px;
+      font-size: 13px;
       color: var(--ink);
       line-height: 1.6;
       overflow-x: auto;
+      max-width: 100%;
+      margin: 0;
     }
 
     /* Footer */
@@ -1108,13 +1119,14 @@ if is_stationary:
 
         <div class="feature-card soft">
           <h3>2D AR-Safe Headroom Normalization.</h3>
-          <p>Cropping horizontal video into vertical 9:16 split panels (1080×960) typically causes severe distortion. Equal 608×541 source crops guarantee identical 1.776× scaling on both axes with natural $cy = 0.42$ headroom.</p>
+          <p>Cropping horizontal video into vertical 9:16 split panels (1080×960) typically causes severe distortion. Equal 608×541 source crops guarantee identical 1.776× scaling on both axes with natural eye-line headroom (cy = 0.42).</p>
           <div class="code-card">
             <div class="code-card-header">backend/src/video_processing.py</div>
-            <pre><code># AR-Safe universal crop dimensions (1080p source)
-CROP_W_1 = 608   # universal 9:16 crop width
-CROP_H_HALF = int(round(CROP_W_1 * (OUT_H // 2) / OUT_W))  # = 541px
-# Scale factor mismatch between horiz and vert is < 0.1%</code></pre>
+            <pre><code># AR-Safe 9:16 crop dimensions (1080p source)
+CROP_W_1 = 608  # universal 9:16 width
+h_half = OUT_H // 2
+CROP_H_HALF = int(round(CROP_W_1 * h_half / OUT_W))  # 541px
+# Scale mismatch (H vs V) is &lt; 0.1%</code></pre>
           </div>
         </div>
       </div>
