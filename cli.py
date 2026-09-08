@@ -138,13 +138,32 @@ def main():
             video_source = cleaned_source
             is_youtube = True
             break
-        elif os.path.isfile(cleaned_source):
-            video_source = os.path.abspath(cleaned_source)
+        
+        # Check direct path, tilde expansion, and auto-append common video extensions
+        candidate = None
+        paths_to_check = [cleaned_source, os.path.expanduser(cleaned_source)]
+        if not os.path.isabs(cleaned_source):
+            paths_to_check.extend([str(ROOT_DIR / cleaned_source), str(Path.cwd() / cleaned_source)])
+
+        for p in paths_to_check:
+            if os.path.isfile(p):
+                candidate = p
+                break
+            for ext in [".mov", ".mp4", ".mkv", ".webm", ".avi", ".m4v"]:
+                if os.path.isfile(p + ext):
+                    candidate = p + ext
+                    break
+            if candidate:
+                break
+
+        if candidate:
+            video_source = os.path.abspath(candidate)
             is_youtube = False
+            print(f"🎬 Resolved local video: {video_source}")
             break
         else:
             print(f"❌ File not found or invalid YouTube URL: {cleaned_source}")
-            print("   Please provide a valid file path or YouTube link.\n")
+            print("   Please provide a valid file path (e.g. test_video.mov) or YouTube link.\n")
 
     # 2. Subtitle Style
     caption_style = "hormozi"
