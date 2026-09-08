@@ -564,50 +564,6 @@
       overflow-x: auto;
     }
 
-    /* Checklist */
-    .checklist-grid {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-sm);
-    }
-
-    .check-row {
-      background-color: var(--canvas-soft);
-      border-radius: var(--rounded-sm);
-      padding: var(--spacing-md) var(--spacing-lg);
-      display: flex;
-      align-items: flex-start;
-      gap: var(--spacing-md);
-    }
-
-    .check-circle {
-      width: 20px;
-      height: 20px;
-      border-radius: var(--rounded-full);
-      border: 1.5px solid var(--ink);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--ink);
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-
-    .check-row-title {
-      font-size: 15px;
-      font-weight: 650;
-      color: var(--ink);
-      margin-bottom: 2px;
-    }
-
-    .check-row-desc {
-      font-size: 13.5px;
-      color: var(--text-muted);
-      line-height: 1.5;
-    }
-
     /* Footer */
     footer.mobbin-footer {
       background-color: var(--ink);
@@ -713,7 +669,7 @@
         <a href="#showcase" class="nav-link">Clip Showcase</a>
         <a href="#pipeline" class="nav-link">Architecture</a>
         <a href="#engineering" class="nav-link">Deep Dive</a>
-        <a href="#evaluation" class="nav-link">Judge's Guide</a>
+        <a href="#quickstart" class="nav-link">Quickstart</a>
       </div>
 
       <a href="https://github.com/ETS2K7/clipped-ai" class="nav-cta" target="_blank" rel="noopener">
@@ -978,68 +934,8 @@ CROP_H_HALF = int(round(CROP_W_1 * (OUT_H // 2) / OUT_W))  # = 541px
         </div>
       </div>
     </section>
-
-    <!-- Judge's Evaluation Checklist -->
-    <section id="evaluation">
-      <div class="section-header">
-        <div class="section-tag">Evaluation Guide</div>
-        <h2 class="section-heading">Judge's evaluation checklist.</h2>
-        <p class="section-desc">When testing ClippedAI, we invite judges to inspect these six specific technical attributes in the output.</p>
-      </div>
-
-      <div class="checklist-grid">
-        <div class="check-row">
-          <div class="check-circle">✓</div>
-          <div>
-            <div class="check-row-title">1. Camera Stability (Zero Micro-Jitter).</div>
-            <div class="check-row-desc">Play any clip in <code>clips/</code>. Notice how the camera remains rock-solid without wandering or drifting during dialogue.</div>
-          </div>
-        </div>
-
-        <div class="check-row">
-          <div class="check-circle">✓</div>
-          <div>
-            <div class="check-row-title">2. Instant Snap-Cuts on Speaker Turns.</div>
-            <div class="check-row-desc">Observe dialogue transitions. The camera snaps cleanly and instantly between speakers without slow, nauseating pans across the frame.</div>
-          </div>
-        </div>
-
-        <div class="check-row">
-          <div class="check-circle">✓</div>
-          <div>
-            <div class="check-row-title">3. Layout-Aware Subtitle Collision Avoidance.</div>
-            <div class="check-row-desc">In split-screen scenes, verify that subtitles automatically center on the dividing seam (<code>\an5\pos(540,960)</code>), never obscuring either speaker's face.</div>
-          </div>
-        </div>
-
-        <div class="check-row">
-          <div class="check-circle">✓</div>
-          <div>
-            <div class="check-row-title">4. Word-Level Synchronized Kinetic Typography.</div>
-            <div class="check-row-desc">Notice the Hormozi-style neon karaoke glow effect snapping precisely to spoken breath pauses without cutting words mid-syllable.</div>
-          </div>
-        </div>
-
-        <div class="check-row">
-          <div class="check-circle">✓</div>
-          <div>
-            <div class="check-row-title">5. Creator SEO Distribution Package.</div>
-            <div class="check-row-desc">Open <code>clips/&lt;Title&gt;/assets/seo_summary.txt</code>. Notice tailored title variations, descriptions, and hashtags for YouTube Shorts, TikTok, and Reels.</div>
-          </div>
-        </div>
-
-        <div class="check-row">
-          <div class="check-circle">✓</div>
-          <div>
-            <div class="check-row-title">6. Deterministic Sub-Second Pipeline Caching.</div>
-            <div class="check-row-desc">Run <code>./cli.py</code> a second time on the same video. Notice how deterministic fingerprint caching skips downloads and transcription instantly.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- Local Installation & Quickstart -->
-    <section>
+    <section id="quickstart">
       <div class="section-header">
         <div class="section-tag">Quickstart</div>
         <h2 class="section-heading">Local installation & execution.</h2>
