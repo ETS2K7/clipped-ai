@@ -267,7 +267,8 @@
     .hero-phone-card video {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
+      background-color: #000;
       display: block;
     }
 
@@ -490,17 +491,18 @@
       border-radius: var(--rounded-md);
       padding: var(--spacing-xxl);
       display: grid;
-      grid-template-columns: 340px 1fr;
+      grid-template-columns: 310px 1fr;
       gap: var(--spacing-xxl);
       align-items: center;
     }
 
     .video-frame {
       width: 100%;
-      height: 540px;
+      max-width: 320px;
+      aspect-ratio: 9 / 16;
       border-radius: var(--rounded-sm);
       overflow: hidden;
-      background-color: var(--ink);
+      background-color: #000;
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       position: relative;
     }
@@ -508,7 +510,22 @@
     .video-frame video {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
+      background-color: #000;
+      display: block;
+    }
+
+    /* Fullscreen rules ensuring vertical 9:16 videos never crop or zoom */
+    video:fullscreen,
+    video:-webkit-full-screen,
+    video:-moz-full-screen,
+    :fullscreen video,
+    :-webkit-full-screen video,
+    :-moz-full-screen video {
+      object-fit: contain !important;
+      background-color: #000 !important;
+      width: 100% !important;
+      height: 100% !important;
     }
 
     .showcase-content {
@@ -738,7 +755,7 @@
       h1.hero-title { font-size: 38px; }
       .grid-3, .grid-2 { grid-template-columns: 1fr; }
       .showcase-container { grid-template-columns: 1fr; padding: var(--spacing-lg); }
-      .video-frame { height: 460px; }
+      .video-frame { max-width: 320px; margin: 0 auto; height: auto; }
       .step-card { grid-template-columns: 1fr; gap: var(--spacing-sm); }
       .footer-top { flex-direction: column; gap: var(--spacing-xl); }
     }
