@@ -151,7 +151,17 @@ def run_pipeline(
 
         sub_file = generated_ass if burn_subtitles else None
 
-        # 3d. Merge and mux final video
+        # 3d. Hook Thumbnail (generate from clean 9:16 tracked video before subtitle burn-in)
+        thumb_path = str(clips_dir / f"{clip_prefix}_thumb.jpg")
+        generate_hook_thumbnail(
+            trk_vid,
+            thumb_path,
+            hook_text=clip["title"],
+            virality_score=clip["virality_score"],
+            timestamp_s=min(2.0, clip_dur / 2.0),
+        )
+
+        # 3e. Merge and mux final video
         report(
             "rendering",
             f"Merging audio and burning subtitles for clip {idx}...",
@@ -168,16 +178,6 @@ def run_pipeline(
             fonts_dir=fonts_dir_str,
         )
         final_video_path = str(clips_dir / f"clip_{idx}.mp4")
-
-        # 3e. Hook Thumbnail
-        thumb_path = str(clips_dir / f"{clip_prefix}_thumb.jpg")
-        generate_hook_thumbnail(
-            final_video_path,
-            thumb_path,
-            hook_text=clip["title"],
-            virality_score=clip["virality_score"],
-            timestamp_s=min(2.0, clip_dur / 2.0),
-        )
 
         # 3g. Creator SEO Pack
         snippet_words = [
