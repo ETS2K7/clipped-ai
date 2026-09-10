@@ -125,11 +125,28 @@ def main():
     print("      ClippedAI — Video Clipping & Channel Automation CLI")
     print("=" * 60 + "\n")
 
-    # 1. Prompt for Video Source
-    while True:
-        raw_input = input("Enter YouTube URL or local video file path: ").strip()
-        cleaned_source = raw_input.strip("\"' ")
+    import argparse
+    parser = argparse.ArgumentParser(description="ClippedAI — Video Clipping & Channel Automation CLI")
+    parser.add_argument("source", nargs="?", default=None, help="YouTube URL or local video file path")
+    parser.add_argument("--url", dest="url", default=None, help="YouTube URL or local video file path")
+    parser.add_argument("--aspect-ratio", choices=["9:16", "original"], default=None, help="Aspect ratio (9:16 or original)")
+    parser.add_argument("--no-clip", "--full-video", dest="full_video", action="store_true", default=False, help="Process full video without clipping")
+    parser.add_argument("--focus", default=None, help="Specific moment or keyword to prioritize")
+    cli_args, _ = parser.parse_known_args()
 
+    # 1. Resolve Video Source (via flag/arg or interactive prompt)
+    initial_source = cli_args.url or cli_args.source
+    video_source = None
+    is_youtube = False
+
+    while True:
+        if initial_source:
+            raw_input = initial_source
+            initial_source = None
+        else:
+            raw_input = input("Enter YouTube URL or local video file path: ").strip()
+
+        cleaned_source = raw_input.strip("\"' ")
         if not cleaned_source:
             print("❌ Input cannot be empty. Please try again.\n")
             continue
@@ -138,7 +155,7 @@ def main():
             video_source = cleaned_source
             is_youtube = True
             break
-        
+
         # Check direct path, tilde expansion, and auto-append common video extensions
         candidate = None
         paths_to_check = [cleaned_source, os.path.expanduser(cleaned_source)]
@@ -165,37 +182,45 @@ def main():
             print(f"❌ File not found or invalid YouTube URL: {cleaned_source}")
             print("   Please provide a valid file path (e.g. test_video.mov) or YouTube link.\n")
 
-    # 2. Aspect Ratio: Ask whether to keep original aspect ratio
-    print("\nDo you want to keep the video's original aspect ratio?")
-    print("  [1] No  — Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]")
-    print("  [2] Yes — Keep Original Aspect Ratio (e.g. 16:9 Widescreen)")
-    ar_choice = input("Choice [1/2] (default: 1): ").strip().lower()
-    if ar_choice in ("2", "y", "yes", "orig", "original", "wide", "widescreen"):
-        aspect_ratio = "original"
-        print("  👉 Selected: Keep Original Aspect Ratio")
+    # 2. Aspect Ratio: CLI argument or interactive prompt
+    if cli_args.aspect_ratio:
+        aspect_ratio = cli_args.aspect_ratio
+        print(f"\n📐 Aspect Ratio: {aspect_ratio}")
     else:
-        aspect_ratio = "9:16"
-        print("  👉 Selected: Convert to 9:16 Vertical")
+        print("\nDo you want to keep the video's original aspect ratio?")
+        print("  [1] No  — Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]")
+        print("  [2] Yes — Keep Original Aspect Ratio (e.g. 16:9 Widescreen)")
+        ar_choice = input("Choice [1/2] (default: 1): ").strip().lower()
+        if ar_choice in ("2", "y", "yes", "orig", "original", "wide", "widescreen"):
+            aspect_ratio = "original"
+            print("  👉 Selected: Keep Original Aspect Ratio")
+        else:
+            aspect_ratio = "9:16"
+            print("  👉 Selected: Convert to 9:16 Vertical")
 
-    # 3. Clipping Mode: Ask whether to clip the video
-    print("\nDo you want the video to be clipped?")
-    print("  [1] Yes — AI Viral Clipping (Extract top engaging moments) [Default]")
-    print("  [2] No  — Full Video (Process full video with subtitles, no clipping)")
-    clip_choice = input("Choice [1/2] (default: 1): ").strip().lower()
-    if clip_choice in ("2", "n", "no", "full", "full video", "noclipping", "no clipping"):
+    # 3. Clipping Mode: CLI argument or interactive prompt
+    if cli_args.full_video:
         clip_video = False
-        print("  👉 Selected: Full Video (No clipping)")
+        print("✂️  Clipping Mode: Full Video (No clipping)")
     else:
-        clip_video = True
-        print("  👉 Selected: AI Viral Clipping")
+        print("\nDo you want the video to be clipped?")
+        print("  [1] Yes — AI Viral Clipping (Extract top engaging moments) [Default]")
+        print("  [2] No  — Full Video (Process full video with subtitles, no clipping)")
+        clip_choice = input("Choice [1/2] (default: 1): ").strip().lower()
+        if clip_choice in ("2", "n", "no", "full", "full video", "noclipping", "no clipping"):
+            clip_video = False
+            print("  👉 Selected: Full Video (No clipping)")
+        else:
+            clip_video = True
+            print("  👉 Selected: AI Viral Clipping")
 
     # 4. Subtitle Style
     caption_style = "hormozi"
     print("\nSubtitle Style: Hormozi (Bold alternating yellow/green neon highlight)")
 
     # 5. Prompt for Keyword / Focus (Optional, for AI clipping)
-    user_focus = None
-    if clip_video:
+    user_focus = cli_args.focus
+    if clip_video and user_focus is None:
         focus_input = input("Specific moment or keyword to prioritize (press Enter to skip): ").strip()
         user_focus = focus_input if focus_input else None
 

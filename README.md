@@ -254,9 +254,15 @@ Launch the CLI directly:
 ./cli.py
 ```
 
-The CLI will prompt for:
-1. **Video Source:** Paste any public YouTube URL (e.g. `https://www.youtube.com/watch?v=_qCVz10tnUQ`) or provide the absolute path to a local MP4/MOV file.
-2. **Target Focus / Keyword (Optional):** Press `Enter` to allow the AI to locate the top viral moments across the entire video, or enter a keyword (e.g. `"salary"`, `"AI"`, `"leadership"`) to prioritize hooks discussing that topic.
+The CLI interactively guides you through:
+1. **Video Source:** Paste any YouTube URL or provide a path to a local MP4/MOV file.
+2. **Aspect Ratio:**
+   - `[1] No — Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]`
+   - `[2] Yes — Keep Original Aspect Ratio (e.g. 16:9 Widescreen)`
+3. **Clipping Mode:**
+   - `[1] Yes — AI Viral Clipping (Extract top engaging moments) [Default]`
+   - `[2] No — Full Video (Process entire video with subtitles, no clipping)`
+4. **Target Focus / Keyword (Optional):** Press `Enter` to auto-detect viral hooks, or specify a keyword (e.g. `"salary"`, `"AI"`, `"leadership"`). Bypassed in Full Video mode.
 
 ```text
 ============================================================
@@ -265,17 +271,42 @@ The CLI will prompt for:
 
 Enter YouTube URL or local video file path: https://www.youtube.com/watch?v=_qCVz10tnUQ
 
+Do you want to keep the video's original aspect ratio?
+  [1] No  — Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]
+  [2] Yes — Keep Original Aspect Ratio (e.g. 16:9 Widescreen)
+Choice [1/2] (default: 1): 
+
+Do you want the video to be clipped?
+  [1] Yes — AI Viral Clipping (Extract top engaging moments) [Default]
+  [2] No  — Full Video (Process full video with subtitles, no clipping)
+Choice [1/2] (default: 1): 
+
 Subtitle Style: Hormozi (Bold alternating yellow/green neon highlight)
 Specific moment or keyword to prioritize (press Enter to skip): promotions
 
 ------------------------------------------------------------
-🚀 Starting Clipping Pipeline [Task: yt__qCVz10tnUQ]
+🚀 Starting Video Pipeline [Task: yt__qCVz10tnUQ]
 📁 Output Folder: clips/Biggest_Lies_Employees_Are_Told_During_Promotions
+📐 Aspect Ratio:  9:16 Vertical (Shorts/Reels/TikTok)
+✂️  Clipping Mode: AI Viral Clipping
 🎨 Caption Style: Hormozi (Bold alternating yellow/green neon highlight)
 🎯 Target Focus:  'promotions'
 ------------------------------------------------------------
 
 [████████████████████████] 100% | Pipeline complete! Processed 1 clip(s)
+```
+
+### 6.2. Non-Interactive CLI Automation (Flags)
+For automated scripts and benchmarks, pass arguments directly:
+```bash
+# Convert YouTube video to 9:16 vertical clips
+./cli.py --url "https://youtu.be/..."
+
+# Keep original widescreen aspect ratio with full-video subtitles (no clipping)
+./cli.py --url "https://youtu.be/..." --aspect-ratio original --full-video
+
+# Prioritize a specific keyword
+./cli.py "video.mp4" --focus "leadership"
 ```
 
 ---
@@ -353,7 +384,7 @@ In addition to `./cli.py`, ClippedAI includes a full FastAPI server with Server-
 
 - **Interactive API Documentation:** `http://localhost:8000/docs`
 - **Health Check:** `GET http://localhost:8000/health`
-- **Submit Processing Task:** `POST /api/process` (accepts `url` or file upload)
+- **Submit Processing Task:** `POST /api/process` (accepts `youtube_url` or file upload, with optional `aspect_ratio` ["9:16", "original"] and `clip_video` [true, false])
 - **Live SSE Progress Stream:** `GET /api/progress/{task_id}` (streams 0–100% stage updates)
 - **Retrieve Task Deliverables:** `GET /api/tasks/{task_id}`
 
