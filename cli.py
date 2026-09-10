@@ -166,28 +166,28 @@ def main():
             print("   Please provide a valid file path (e.g. test_video.mov) or YouTube link.\n")
 
     # 2. Aspect Ratio: Ask whether to keep original aspect ratio
-    print("\nVideo Aspect Ratio:")
-    print("  [1] Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]")
-    print("  [2] Keep Original Aspect Ratio (e.g. 16:9 Widescreen)")
-    ar_choice = input("Do you want to keep the video's original aspect ratio? [1/2 or y/n] (default: 1): ").strip().lower()
+    print("\nDo you want to keep the video's original aspect ratio?")
+    print("  [1] No  — Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]")
+    print("  [2] Yes — Keep Original Aspect Ratio (e.g. 16:9 Widescreen)")
+    ar_choice = input("Choice [1/2] (default: 1): ").strip().lower()
     if ar_choice in ("2", "y", "yes", "orig", "original", "wide", "widescreen"):
         aspect_ratio = "original"
-        print("📐 Mode selected: Keep Original Aspect Ratio")
+        print("  👉 Selected: Keep Original Aspect Ratio")
     else:
         aspect_ratio = "9:16"
-        print("📐 Mode selected: Convert to 9:16 Vertical")
+        print("  👉 Selected: Convert to 9:16 Vertical")
 
     # 3. Clipping Mode: Ask whether to clip the video
-    print("\nClipping Mode:")
-    print("  [1] Yes, AI Viral Clipping (Extract top engaging moments) [Default]")
-    print("  [2] No, Full Video (Process full video with subtitles, no clipping)")
-    clip_choice = input("Do you want the video to be clipped? [1/2 or y/n] (default: 1): ").strip().lower()
+    print("\nDo you want the video to be clipped?")
+    print("  [1] Yes — AI Viral Clipping (Extract top engaging moments) [Default]")
+    print("  [2] No  — Full Video (Process full video with subtitles, no clipping)")
+    clip_choice = input("Choice [1/2] (default: 1): ").strip().lower()
     if clip_choice in ("2", "n", "no", "full", "full video", "noclipping", "no clipping"):
         clip_video = False
-        print("✂️  Mode selected: Full Video (No clipping)")
+        print("  👉 Selected: Full Video (No clipping)")
     else:
         clip_video = True
-        print("✂️  Mode selected: AI Viral Clipping")
+        print("  👉 Selected: AI Viral Clipping")
 
     # 4. Subtitle Style
     caption_style = "hormozi"
