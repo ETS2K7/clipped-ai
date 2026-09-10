@@ -144,15 +144,19 @@ def merge_and_cleanup(tracked_vid: str, extract_vid: str, sub_file: str | None, 
     )
     out_file = f"{work_dir}/clip_{idx}.mp4" if work_dir else f"output/clip_{idx}.mp4"
 
-    # Re-encode tracked .avi (MJPG) to H.264, optionally burn in ASS subtitles, and mux audio.
-    # -c:v libx264 is always available; we intentionally do NOT use NVENC here because
-    # MJPG pixel format (yuvj420p) requires colour-range conversion that NVENC rejects.
-    # The ass= filter path must have colons escaped for FFmpeg's filter syntax on Linux.
-    cmd = [
-        "ffmpeg", "-y",
-        "-i", tracked_vid,
-        "-i", extract_vid,
-    ]
+    # Re-encode tracked video to H.264, optionally burn in ASS subtitles, and mux audio.
+    is_same_input = (tracked_vid == extract_vid)
+    if is_same_input:
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", extract_vid,
+        ]
+    else:
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", tracked_vid,
+            "-i", extract_vid,
+        ]
 
     if sub_file:
         safe_sub = sub_file.replace("\\", "/").replace(":", "\\:")
@@ -182,7 +186,7 @@ def merge_and_cleanup(tracked_vid: str, extract_vid: str, sub_file: str | None, 
     cmd.extend([
         "-c:a", "aac",
         "-map", "0:v:0",
-        "-map", "1:a:0?",
+        "-map", "0:a:0?" if is_same_input else "1:a:0?",
         "-movflags", "+faststart",
         "-shortest",
         out_file,
@@ -192,9 +196,11 @@ def merge_and_cleanup(tracked_vid: str, extract_vid: str, sub_file: str | None, 
 
     # Clean up intermediate files
     try:
-        os.remove(tracked_vid)
-        os.remove(extract_vid)
-        if sub_file:
+        if os.path.exists(tracked_vid):
+            os.remove(tracked_vid)
+        if not is_same_input and os.path.exists(extract_vid):
+            os.remove(extract_vid)
+        if sub_file and os.path.exists(sub_file):
             os.remove(sub_file)
     except OSError as e:
         logger.warning(f"Failed to clean up temporary files for clip {idx}: {e}")

@@ -47,6 +47,9 @@ def generate_subtitles(
     clip: Dict[str, Any],
     idx: int,
     framing_meta: List[Dict[str, Any]],
+    aspect_ratio: str = "9:16",
+    video_width: int = 1080,
+    video_height: int = 1920,
     font_family: Optional[str] = None,
     font_size: Optional[int] = None,
     font_color: Optional[str] = None,
@@ -56,9 +59,10 @@ def generate_subtitles(
     Generates an .ASS subtitle file dynamically mapping words iteratively to
     the bounding box framing logic dictating its positional styling.
 
+    Supports both 9:16 vertical (Shorts/Reels/TikTok) and original widescreen layouts.
     Accepts optional font configuration from the frontend typography bridge:
-      - font_family: e.g. "Montserrat", "Impact" (default: "Arial Black")
-      - font_size:   e.g. 40, 60 (default: 50)
+      - font_family: e.g. "Montserrat", "Impact" (default: "Komika Axis")
+      - font_size:   e.g. 40, 60, 115
       - font_color:  hex string e.g. "#FFFFFF", "#FFD700" (default: white)
     """
     logger.info(
@@ -68,13 +72,27 @@ def generate_subtitles(
     start_ms = clip["start_time"] * 1000
     end_ms = clip["end_time"] * 1000
 
+    # Configure canvas dimensions and responsive layout geometry
+    is_original = (aspect_ratio == "original")
+    res_x = int(video_width) if (is_original and video_width > 0) else 1080
+    res_y = int(video_height) if (is_original and video_height > 0) else 1920
+
     resolved_family = resolve_font_family(font_family)
-    resolved_size = font_size if isinstance(font_size, int) and 50 <= font_size <= 200 else DEFAULT_FONT_SIZE
+    if font_size and isinstance(font_size, int) and 30 <= font_size <= 250:
+        resolved_size = font_size
+    elif is_original:
+        # Scale proportionally to vertical resolution for landscape (e.g. ~64pt at 1080p)
+        resolved_size = max(36, int(round(DEFAULT_FONT_SIZE * (res_y / 1920.0))))
+    else:
+        resolved_size = DEFAULT_FONT_SIZE
+
+    margin_v = int(res_y * 0.08) if is_original else 450
+    outline_val = max(3, int(round(6 * (res_y / 1920.0)))) if is_original else 6
     resolved_ass_color = hex_to_ass_color(font_color)
 
     logger.info(
         f"Subtitle style locked: {resolved_family} / {resolved_size}pt / "
-        f"color={resolved_ass_color}"
+        f"canvas={res_x}x{res_y} / margin_v={margin_v} / color={resolved_ass_color}"
     )
 
     def get_layout_for_time(ms: float) -> str:
@@ -110,16 +128,16 @@ def generate_subtitles(
             for i in range(min(len(rom_words), len(clip_words))):
                 clip_words[i]["text"] = rom_words[i]
 
-    # Dynamically build ASS header with resolved font configuration
+    # Dynamically build ASS header with resolved font and canvas configuration
     header = f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1080
-PlayResY: 1920
+PlayResX: {res_x}
+PlayResY: {res_y}
 WrapStyle: 1
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Hormozi,{resolved_family},{resolved_size},{resolved_ass_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,110,100,0,0,1,6,0,2,10,10,450,1
+Style: Hormozi,{resolved_family},{resolved_size},{resolved_ass_color},&H000000FF,&H00000000,&H80000000,-1,0,0,0,110,100,0,0,1,{outline_val},0,2,10,10,{margin_v},1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
@@ -182,8 +200,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
             text_parts = []
             
-            if layout == "SPLIT":
-                text_parts.append("{\\an5\\pos(540,960)}")
+            if not is_original:
+                if layout == "SPLIT":
+                    text_parts.append("{\\an5\\pos(540,960)}")
 
             for j, cw in enumerate(chunk):
                 # Escape ASS special syntax characters to prevent subtitle corruption
@@ -217,6 +236,9 @@ def generate_karaoke_ass(
     clip_end_s: float,
     output_ass_path: str,
     framing_meta: Optional[List[Dict[str, Any]]] = None,
+    aspect_ratio: str = "9:16",
+    video_width: int = 1080,
+    video_height: int = 1920,
     preset_name: str = "hormozi",
 ) -> str:
     """Compatibility wrapper for generate_subtitles supporting direct path output."""
@@ -229,6 +251,9 @@ def generate_karaoke_ass(
             clip=clip_dict,
             idx=0,
             framing_meta=framing_meta or [],
+            aspect_ratio=aspect_ratio,
+            video_width=video_width,
+            video_height=video_height,
             work_dir=td,
         )
         shutil.copy2(out_file, output_ass_path)

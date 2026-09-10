@@ -39,37 +39,45 @@ def generate_hook_thumbnail(
     hook_text: str,
     virality_score: int = 90,
     timestamp_s: float = 2.0,
+    aspect_ratio: str = "9:16",
 ) -> str:
     """
-    Generates a high-CTR 9:16 portrait thumbnail with gradient contrast vignette,
+    Generates a high-CTR thumbnail with gradient contrast vignette,
     bold hook typography, and a virality badge.
+    Supports both 9:16 vertical and original (e.g. 16:9 widescreen) aspect ratios.
     """
     frame = extract_hook_frame(video_path, timestamp_s)
     if frame is None:
         raise RuntimeError(f"Could not extract frame from video: {video_path}")
 
-    # Ensure 1080x1920
-    if frame.shape[0] != OUT_HEIGHT or frame.shape[1] != OUT_WIDTH:
-        frame = cv2.resize(frame, (OUT_WIDTH, OUT_HEIGHT))
+    # Determine dimensions based on aspect ratio mode
+    if aspect_ratio == "original":
+        target_h, target_w = frame.shape[0], frame.shape[1]
+    else:
+        target_w, target_h = OUT_WIDTH, OUT_HEIGHT
+        if frame.shape[0] != OUT_HEIGHT or frame.shape[1] != OUT_WIDTH:
+            frame = cv2.resize(frame, (OUT_WIDTH, OUT_HEIGHT))
 
     # Convert to RGB PIL Image
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     img = Image.fromarray(rgb_frame)
-    draw = ImageDraw.Draw(img, "RGBA")
 
     # Add subtle vignette gradient at top and bottom for text legibility
-    vignette = Image.new("RGBA", (OUT_WIDTH, OUT_HEIGHT), (0, 0, 0, 0))
+    vignette = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
     vignette_draw = ImageDraw.Draw(vignette)
 
     # Top gradient
-    for y in range(400):
-        alpha = int(140 * (1.0 - (y / 400.0)))
-        vignette_draw.line([(0, y), (OUT_WIDTH, y)], fill=(0, 0, 0, alpha))
+    top_vignette_h = int(target_h * 0.22)
+    for y in range(top_vignette_h):
+        alpha = int(140 * (1.0 - (y / float(max(1, top_vignette_h)))))
+        vignette_draw.line([(0, y), (target_w, y)], fill=(0, 0, 0, alpha))
 
     # Bottom gradient
-    for y in range(OUT_HEIGHT - 500, OUT_HEIGHT):
-        alpha = int(180 * ((y - (OUT_HEIGHT - 500)) / 500.0))
-        vignette_draw.line([(0, y), (OUT_WIDTH, y)], fill=(0, 0, 0, alpha))
+    bottom_vignette_h = int(target_h * 0.26)
+    start_bottom_y = target_h - bottom_vignette_h
+    for y in range(start_bottom_y, target_h):
+        alpha = int(180 * ((y - start_bottom_y) / float(max(1, bottom_vignette_h))))
+        vignette_draw.line([(0, y), (target_w, y)], fill=(0, 0, 0, alpha))
 
     img = Image.alpha_composite(img.convert("RGBA"), vignette)
     draw = ImageDraw.Draw(img)
@@ -79,9 +87,10 @@ def generate_hook_thumbnail(
     lines = []
     curr_line = []
 
+    words_per_line = 4 if (aspect_ratio == "original" and target_w > target_h) else 3
     for w in words:
         curr_line.append(w)
-        if len(curr_line) >= 3:
+        if len(curr_line) >= words_per_line:
             lines.append(" ".join(curr_line))
             curr_line = []
     if curr_line:
@@ -90,37 +99,39 @@ def generate_hook_thumbnail(
     # Keep at most top 3 lines
     lines = lines[:3]
 
-    font_size = 86
+    base_font_size = int(round(86 * (target_h / 1920.0 * 1.5))) if aspect_ratio == "original" and target_w > target_h else 86
+    font_size = max(42, base_font_size)
     try:
         font_large = ImageFont.truetype(str(DEFAULT_FONT_PATH), font_size)
     except Exception:
         font_large = ImageFont.load_default()
 
     # Auto-scale font size if any line exceeds frame width
+    max_text_boundary = target_w - int(target_w * 0.1)
     if lines:
         max_w = max(
             draw.textbbox((0, 0), l, font=font_large)[2] - draw.textbbox((0, 0), l, font=font_large)[0]
             for l in lines
         )
-        if max_w > (OUT_WIDTH - 120):
-            scale = (OUT_WIDTH - 120) / max_w
-            font_size = max(52, int(font_size * scale))
+        if max_w > max_text_boundary:
+            scale = max_text_boundary / float(max_w)
+            font_size = max(36, int(font_size * scale))
             try:
                 font_large = ImageFont.truetype(str(DEFAULT_FONT_PATH), font_size)
             except Exception:
                 font_large = ImageFont.load_default()
 
-    # Center hook text vertically and horizontally on the 9:16 portrait frame
+    # Center hook text vertically and horizontally
     line_spacing = int(font_size * 1.28)
     total_text_h = (len(lines) - 1) * line_spacing + font_size
-    start_y = (OUT_HEIGHT - total_text_h) // 2
+    start_y = (target_h - total_text_h) // 2
 
-    outline_w = 8
+    outline_w = max(4, int(round(8 * (target_h / 1920.0)))) if aspect_ratio == "original" else 8
     for idx, line in enumerate(lines):
         # Calculate text bounding box to center horizontally
         bbox = draw.textbbox((0, 0), line, font=font_large)
         text_w = bbox[2] - bbox[0]
-        pos_x = (OUT_WIDTH - text_w) // 2
+        pos_x = (target_w - text_w) // 2
         pos_y = start_y + (idx * line_spacing)
 
         # Highlight color for second line

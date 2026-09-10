@@ -49,6 +49,8 @@ task_progress_queues: Dict[str, asyncio.Queue] = {}
 
 class ProcessRequest(BaseModel):
     youtube_url: Optional[str] = None
+    aspect_ratio: str = "9:16"
+    clip_video: bool = True
     caption_style: str = "hormozi"
     user_focus: Optional[str] = None
     burn_subtitles: bool = True
@@ -63,6 +65,8 @@ def _get_or_create_queue(task_id: str) -> asyncio.Queue:
 def _background_pipeline_worker(
     video_source: str,
     task_id: str,
+    aspect_ratio: str,
+    clip_video: bool,
     caption_style: str,
     user_focus: Optional[str],
     burn_subtitles: bool,
@@ -94,6 +98,8 @@ def _background_pipeline_worker(
         result = run_pipeline(
             video_source=video_source,
             task_id=task_id,
+            aspect_ratio=aspect_ratio,
+            clip_video=clip_video,
             caption_style=caption_style,
             user_focus=user_focus,
             burn_subtitles=burn_subtitles,
@@ -133,6 +139,8 @@ async def start_processing_job(
     request: Optional[ProcessRequest] = None,
     file: Optional[UploadFile] = File(None),
     youtube_url: Optional[str] = Form(None),
+    aspect_ratio: str = Form("9:16"),
+    clip_video: bool = Form(True),
     caption_style: str = Form("hormozi"),
     user_focus: Optional[str] = Form(None),
     burn_subtitles: bool = Form(True),
@@ -142,6 +150,8 @@ async def start_processing_job(
     """
     # Parse input from either JSON or multipart form
     target_youtube = (request.youtube_url if request else None) or youtube_url
+    target_aspect = (request.aspect_ratio if request else None) or aspect_ratio
+    target_clip = (request.clip_video if request else None) if request else clip_video
     target_style = (request.caption_style if request else None) or caption_style
     target_focus = (request.user_focus if request else None) or user_focus
     target_burn = (request.burn_subtitles if request else None) if request else burn_subtitles
@@ -180,6 +190,8 @@ async def start_processing_job(
         _background_pipeline_worker,
         video_source=video_source,
         task_id=task_id,
+        aspect_ratio=target_aspect,
+        clip_video=target_clip,
         caption_style=target_style,
         user_focus=target_focus,
         burn_subtitles=target_burn,

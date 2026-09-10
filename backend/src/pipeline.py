@@ -29,6 +29,8 @@ logger = get_logger(__name__)
 def run_pipeline(
     video_source: str,
     task_id: str,
+    aspect_ratio: str = "9:16",
+    clip_video: bool = True,
     caption_style: str = "hormozi",
     user_focus: Optional[str] = None,
     burn_subtitles: bool = True,
@@ -37,6 +39,10 @@ def run_pipeline(
     """
     Executes the complete video-to-viral-clips pipeline.
     Streams real-time progress percentages and status messages via callback.
+
+    Supports:
+      - aspect_ratio: "9:16" (vertical reframing) or "original" (preserves widescreen/source format)
+      - clip_video: True (extract top viral clips) or False (process complete video without clipping)
     """
     task_dir = STORAGE_DIR / f"task_{task_id}"
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -61,7 +67,10 @@ def run_pipeline(
         source_title = Path(video_source).stem
 
     video_info = get_video_info(video_path)
-    report("ingesting", f"Ingested '{source_title}' ({video_info['duration']}s)", 15)
+    vid_width = video_info.get("width", 1920)
+    vid_height = video_info.get("height", 1080)
+    total_dur = video_info["duration"]
+    report("ingesting", f"Ingested '{source_title}' ({total_dur}s, {vid_width}x{vid_height})", 15)
 
     # 2. Transcribe with speaker diarization
     report("transcribing", "Transcribing speech and extracting word timestamps...", 25)
@@ -75,26 +84,38 @@ def run_pipeline(
     if not words:
         raise RuntimeError("Transcription produced no words. Audio may be silent or corrupted.")
 
-    report("analyzing", "Identifying high-retention hooks and viral moments...", 45)
-    clips = select_viral_clips(
-        words,
-        user_focus=user_focus,
-        source_fingerprint=source_fingerprint,
-    )
-    if not clips:
-        raise RuntimeError("No suitable viral moments were identified.")
-
-    report("analyzing", f"Selected {len(clips)} viral clips with high retention scores.", 55)
+    if not clip_video:
+        report("analyzing", "Full video mode: preserving entire video without clipping...", 50)
+        clips = [{
+            "index": 1,
+            "title": f"{source_title[:40]} (Full Video)",
+            "start_time": 0.0,
+            "end_time": float(total_dur),
+            "duration": float(total_dur),
+            "virality_score": 100,
+            "hook_type": "full_video",
+            "hook_rationale": "Full video presentation with synchronized kinetic subtitles.",
+        }]
+    else:
+        report("analyzing", "Identifying high-retention hooks and viral moments...", 45)
+        clips = select_viral_clips(
+            words,
+            user_focus=user_focus,
+            source_fingerprint=source_fingerprint,
+        )
+        if not clips:
+            raise RuntimeError("No suitable viral moments were identified.")
+        report("analyzing", f"Selected {len(clips)} viral clips with high retention scores.", 55)
 
     # 3. Process each clip through Fast-ASD tracking, reframing, and styling
     clips_dir = task_dir / "clips"
     clips_dir.mkdir(parents=True, exist_ok=True)
     processed_clips: List[Dict[str, Any]] = []
 
-    progress_step = 35.0 / len(clips)
+    progress_step = 35.0 / max(1, len(clips))
     current_progress = 55.0
 
-    local_tracker = LocalFastASDTracker.get_instance()
+    local_tracker = LocalFastASDTracker.get_instance() if aspect_ratio != "original" else None
 
     for idx, clip in enumerate(clips, start=1):
         clip_prefix = f"clip_{idx}"
@@ -110,29 +131,33 @@ def run_pipeline(
 
         work_dir = str(clips_dir)
 
-        # 3a. Extract 16:9 segment (H.264/AAC re-encode for stable OpenCV decoding)
+        # 3a. Extract segment (H.264/AAC re-encode for stable OpenCV/FFmpeg processing)
         report(
             "extracting",
-            f"Extracting raw segment for clip {idx} ({clip_start}s - {clip_end}s)...",
+            f"Extracting segment for clip {idx} ({clip_start}s - {clip_end}s)...",
             int(current_progress + 2),
         )
         ext_vid = extract_segment(video_path, clip, idx, work_dir=work_dir, use_gpu=False)
 
-        # 3b. Fast-ASD multi-speaker tracking & adaptive 9:16 reframing
-        report(
-            "tracking",
-            f"Running Fast-ASD active speaker tracking & adaptive framing for clip {idx}...",
-            int(current_progress + 8),
-        )
-        trk_vid, chunk_meta = track_speaker_and_frame(
-            clip_file=ext_vid,
-            idx=idx,
-            clip=clip,
-            words=words,
-            work_dir=work_dir,
-            tracker=local_tracker,
-            use_gpu=False,
-        )
+        # 3b. Framing: 9:16 portrait tracking or keep original aspect ratio
+        if aspect_ratio == "original":
+            trk_vid = ext_vid
+            chunk_meta = [{"start_ms": 0, "end_ms": clip_dur * 1000, "flag": "ORIGINAL"}]
+        else:
+            report(
+                "tracking",
+                f"Running Fast-ASD active speaker tracking & adaptive framing for clip {idx}...",
+                int(current_progress + 8),
+            )
+            trk_vid, chunk_meta = track_speaker_and_frame(
+                clip_file=ext_vid,
+                idx=idx,
+                clip=clip,
+                words=words,
+                work_dir=work_dir,
+                tracker=local_tracker,
+                use_gpu=False,
+            )
 
         # 3c. Layout-aware ASS Subtitles & SRT
         ass_path = str(clips_dir / f"{clip_prefix}_subtitles.ass")
@@ -144,6 +169,9 @@ def run_pipeline(
             clip=clip,
             idx=idx,
             framing_meta=chunk_meta,
+            aspect_ratio=aspect_ratio,
+            video_width=vid_width,
+            video_height=vid_height,
             work_dir=work_dir,
         )
         import shutil
@@ -151,7 +179,7 @@ def run_pipeline(
 
         sub_file = generated_ass if burn_subtitles else None
 
-        # 3d. Hook Thumbnail (generate from clean 9:16 tracked video before subtitle burn-in)
+        # 3d. Hook Thumbnail (generate from clean video before subtitle burn-in)
         thumb_path = str(clips_dir / f"{clip_prefix}_thumb.jpg")
         generate_hook_thumbnail(
             trk_vid,
@@ -159,6 +187,7 @@ def run_pipeline(
             hook_text=clip["title"],
             virality_score=clip["virality_score"],
             timestamp_s=min(2.0, clip_dur / 2.0),
+            aspect_ratio=aspect_ratio,
         )
 
         # 3e. Merge and mux final video
@@ -217,6 +246,8 @@ def run_pipeline(
         "task_id": task_id,
         "source_title": source_title,
         "video_path": video_path,
+        "aspect_ratio": aspect_ratio,
+        "clip_video": clip_video,
         "total_duration": video_info["duration"],
         "elapsed_seconds": elapsed_time,
         "clips": processed_clips,

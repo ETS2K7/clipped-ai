@@ -165,15 +165,41 @@ def main():
             print(f"❌ File not found or invalid YouTube URL: {cleaned_source}")
             print("   Please provide a valid file path (e.g. test_video.mov) or YouTube link.\n")
 
-    # 2. Subtitle Style
+    # 2. Aspect Ratio: Ask whether to keep original aspect ratio
+    print("\nVideo Aspect Ratio:")
+    print("  [1] Convert to 9:16 Vertical (Shorts, Reels, TikTok) [Default]")
+    print("  [2] Keep Original Aspect Ratio (e.g. 16:9 Widescreen)")
+    ar_choice = input("Do you want to keep the video's original aspect ratio? [1/2 or y/n] (default: 1): ").strip().lower()
+    if ar_choice in ("2", "y", "yes", "orig", "original", "wide", "widescreen"):
+        aspect_ratio = "original"
+        print("📐 Mode selected: Keep Original Aspect Ratio")
+    else:
+        aspect_ratio = "9:16"
+        print("📐 Mode selected: Convert to 9:16 Vertical")
+
+    # 3. Clipping Mode: Ask whether to clip the video
+    print("\nClipping Mode:")
+    print("  [1] Yes, AI Viral Clipping (Extract top engaging moments) [Default]")
+    print("  [2] No, Full Video (Process full video with subtitles, no clipping)")
+    clip_choice = input("Do you want the video to be clipped? [1/2 or y/n] (default: 1): ").strip().lower()
+    if clip_choice in ("2", "n", "no", "full", "full video", "noclipping", "no clipping"):
+        clip_video = False
+        print("✂️  Mode selected: Full Video (No clipping)")
+    else:
+        clip_video = True
+        print("✂️  Mode selected: AI Viral Clipping")
+
+    # 4. Subtitle Style
     caption_style = "hormozi"
     print("\nSubtitle Style: Hormozi (Bold alternating yellow/green neon highlight)")
 
-    # 3. Prompt for Keyword / Focus (Optional)
-    focus_input = input("Specific moment or keyword to prioritize (press Enter to skip): ").strip()
-    user_focus = focus_input if focus_input else None
+    # 5. Prompt for Keyword / Focus (Optional, for AI clipping)
+    user_focus = None
+    if clip_video:
+        focus_input = input("Specific moment or keyword to prioritize (press Enter to skip): ").strip()
+        user_focus = focus_input if focus_input else None
 
-    # 4. Prepare Destination Folder inside clips/
+    # 6. Prepare Destination Folder inside clips/
     clips_base_dir = ROOT_DIR / "clips"
     clips_base_dir.mkdir(parents=True, exist_ok=True)
 
@@ -186,8 +212,12 @@ def main():
     output_subfolder.mkdir(parents=True, exist_ok=True)
 
     print("\n" + "-" * 60)
-    print(f"🚀 Starting Clipping Pipeline [Task: {task_id}]")
+    print(f"🚀 Starting Video Pipeline [Task: {task_id}]")
     print(f"📁 Output Folder: {output_subfolder.relative_to(ROOT_DIR)}" + (" (overwriting existing clips)" if is_overwrite else ""))
+    ar_desc = "Original Aspect Ratio" if aspect_ratio == "original" else "9:16 Vertical (Shorts/Reels/TikTok)"
+    clip_desc = "AI Viral Clipping" if clip_video else "Full Video (No clipping)"
+    print(f"📐 Aspect Ratio:  {ar_desc}")
+    print(f"✂️  Clipping Mode: {clip_desc}")
     print("🎨 Caption Style: Hormozi (Bold alternating yellow/green neon highlight)")
     if user_focus:
         print(f"🎯 Target Focus:  '{user_focus}'")
@@ -203,11 +233,13 @@ def main():
         if percent >= 100 or stage == "completed":
             sys.stdout.write("\n")
 
-    # 5. Run Pipeline
+    # 7. Run Pipeline
     try:
         pipeline_result = run_pipeline(
             video_source=video_source,
             task_id=task_id,
+            aspect_ratio=aspect_ratio,
+            clip_video=clip_video,
             caption_style=caption_style,
             user_focus=user_focus,
             burn_subtitles=True,
@@ -217,7 +249,7 @@ def main():
         print(f"\n\n❌ Pipeline Error: {e}")
         sys.exit(1)
 
-    # 6. Copy Deliverables to Destination Subfolder
+    # 8. Copy Deliverables to Destination Subfolder
     source_title = pipeline_result.get("source_title")
     if source_title:
         refined_folder_name = sanitize_filename(source_title)
@@ -238,7 +270,7 @@ def main():
     for clip in generated_clips:
         idx = clip["index"]
 
-        # Copy only the vertical video clip
+        # Copy final video clip
         dest_video = output_subfolder / f"clip_{idx}.mp4"
         shutil.copy2(clip["video_path"], dest_video)
 
@@ -255,7 +287,7 @@ def main():
     # Save social media copy and hashtags into assets/
     write_seo_summary(assets_subfolder, generated_clips)
 
-    # 7. Print Completion Summary Table
+    # 9. Print Completion Summary Table
     print("\n" + "=" * 60)
     print("                 PIPELINE COMPLETE! 🎉")
     print("=" * 60)
@@ -273,7 +305,8 @@ def main():
         print(f"{c['index']:<3} {score_badge:<12} {hook_name:<20} {dur_str:<10} {title_trunc}")
 
     print("-" * 75)
-    print(f"\nAll vertical clips saved to:")
+    clips_label = "clips" if len(final_clips_info) > 1 else "video"
+    print(f"\nAll {clips_label} saved to:")
     print(f"👉 {output_subfolder.resolve()}\n")
     print(f"Thumbnails and SEO pack saved to:")
     print(f"📁 {assets_subfolder.resolve()}\n")
