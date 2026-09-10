@@ -174,12 +174,23 @@ def download_youtube(url: str, output_dir: Optional[Path] = None) -> Dict[str, A
     if canonical_file.exists() and canonical_file.stat().st_size > 50000:
         logger.info("Reusing cached YouTube download: %s", canonical_file)
     else:
+        # Clean up any partial files from previously aborted downloads
+        for partial in canonical_dir.glob("original.*"):
+            if not partial.name.endswith(".info.json"):
+                try:
+                    partial.unlink()
+                except OSError:
+                    pass
+
         output_template = str(canonical_dir / "original.%(ext)s")
         cmd = [
             _find_ytdlp(),
             "--no-playlist",
-            "--format", "bestvideo[height<=1080]+bestaudio/best[height<=1080]/best",
+            "--format", "bestvideo[height<=1080][format_note!*=?Premium]+bestaudio/best[height<=1080]/best",
             "--merge-output-format", "mp4",
+            "--retries", "10",
+            "--fragment-retries", "10",
+            "--extractor-args", "youtube:player_client=default,web",
             "--write-info-json",
             "--output", output_template,
             url,
